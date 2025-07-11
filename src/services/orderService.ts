@@ -9,19 +9,62 @@ export interface OrderItem {
   quantity: number
   unit_price: number
   total_price: number
+  created_at: string
 }
 
 export interface Order {
   id: number
   user_id: string
+  order_number: string // NOUVEAU CHAMP
+  
+  // Informations client (TOUS les champs de la BDD)
+  customer_email: string
+  customer_company?: string
+  customer_phone?: string
+  customer_address?: string
+  customer_city?: string
+  customer_postal_code?: string
+  
+  // Informations commande
   total_amount: number
   status: string
-  customer_email: string
-  customer_company: string
-  billing_address?: any
   notes?: string
+  
+  // Dates
   created_at: string
+  updated_at: string
+  
+  // Relations
   order_items?: OrderItem[]
+}
+
+// Fonction pour générer un numéro de commande unique
+async function generateUniqueOrderNumber(): Promise<string> {
+  let orderNumber = ''
+  let exists = true
+  
+  while (exists) {
+    const year = new Date().getFullYear()
+    const month = String(new Date().getMonth() + 1).padStart(2, '0')
+    const day = String(new Date().getDate()).padStart(2, '0')
+    
+    // Générer un numéro aléatoire de 4 chiffres
+    const randomNum = Math.floor(1000 + Math.random() * 9000)
+    
+    // Format: CMD-2025-0711-1234
+    orderNumber = `CMD-${year}-${month}${day}-${randomNum}`
+    
+    // Vérifier si ce numéro existe déjà
+    const { data } = await supabase
+      .from('orders')
+      .select('id')
+      .eq('order_number', orderNumber)
+      .single()
+    
+    exists = !!data
+  }
+  
+  return orderNumber
 }
 
 export const orderService = {
@@ -57,11 +100,94 @@ export const orderService = {
     return data
   },
 
+  // Récupérer une commande par numéro de commande
+  async getOrderByNumber(orderNumber: string): Promise<Order | null> {
+    const { data, error } = await supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (*)
+      `)
+      .eq('order_number', orderNumber)
+      .single()
+    
+    if (error) {
+      if (error.code === 'PGRST116') return null
+      throw error
+    }
+    return data
+  },
+
+  // Créer une nouvelle commande (AVEC TOUS LES CHAMPS + NUMÉRO AUTO)
+  async createOrder(orderData: {
+    user_id: string
+    total_amount: number
+    customer_email: string
+    customer_company?: string
+    customer_phone?: string
+    customer_address?: string
+    customer_city?: string
+    customer_postal_code?: string
+    notes?: string
+    items: {
+      product_id: number
+      product_name: string
+      product_reference: string
+      quantity: number
+      unit_price: number
+      total_price: number
+    }[]
+  }): Promise<Order> {
+    
+    // Générer un numéro de commande unique
+    const orderNumber = await generateUniqueOrderNumber()
+    
+    // Créer la commande AVEC TOUS LES CHAMPS + NUMÉRO
+    const { data: order, error: orderError } = await supabase
+      .from('orders')
+      .insert([{
+        user_id: orderData.user_id,
+        order_number: orderNumber, // NOUVEAU CHAMP
+        total_amount: orderData.total_amount,
+        customer_email: orderData.customer_email,
+        customer_company: orderData.customer_company,
+        customer_phone: orderData.customer_phone,
+        customer_address: orderData.customer_address,
+        customer_city: orderData.customer_city,
+        customer_postal_code: orderData.customer_postal_code,
+        notes: orderData.notes,
+        status: 'pending'
+      }])
+      .select()
+      .single()
+
+    if (orderError) throw orderError
+
+    // Créer les éléments de commande
+    const orderItems = orderData.items.map(item => ({
+      order_id: order.id,
+      product_id: item.product_id,
+      product_name: item.product_name,
+      product_reference: item.product_reference,
+      quantity: item.quantity,
+      unit_price: item.unit_price,
+      total_price: item.total_price
+    }))
+
+    const { error: itemsError } = await supabase
+      .from('order_items')
+      .insert(orderItems)
+
+    if (itemsError) throw itemsError
+
+    return order
+  },
+
   // Mettre à jour le statut d'une commande
   async updateOrderStatus(id: number, status: string): Promise<Order> {
     const { data, error } = await supabase
       .from('orders')
-      .update({ status })
+      .update({ status, updated_at: new Date().toISOString() })
       .eq('id', id)
       .select()
       .single()
@@ -80,53 +206,44 @@ export const orderService = {
     if (error) throw error
   },
 
-  // Créer une nouvelle commande
-    async createOrder(orderData: {
-    user_id: string
-    total_amount: number
-    customer_email: string
-    customer_company: string
-    items: {
-        product_id: number
-        product_name: string
-        product_reference: string
-        quantity: number
-        unit_price: number
-        total_price: number
-    }[]
-    }): Promise<Order> {
-    // Créer la commande
-    const { data: order, error: orderError } = await supabase
-        .from('orders')
-        .insert([{
-        user_id: orderData.user_id,
-        total_amount: orderData.total_amount,
-        customer_email: orderData.customer_email,
-        customer_company: orderData.customer_company,
-        status: 'pending'
-        }])
-        .select()
-        .single()
+  // Rechercher des commandes par critères
+  async searchOrders(criteria: {
+    orderNumber?: string
+    customerEmail?: string
+    status?: string
+    dateFrom?: string
+    dateTo?: string
+  }): Promise<Order[]> {
+    let query = supabase
+      .from('orders')
+      .select(`
+        *,
+        order_items (*)
+      `)
 
-    if (orderError) throw orderError
-
-    // Créer les éléments de commande
-    const orderItems = orderData.items.map(item => ({
-        order_id: order.id,
-        product_id: item.product_id,
-        product_name: item.product_name,
-        product_reference: item.product_reference,
-        quantity: item.quantity,
-        unit_price: item.unit_price,
-        total_price: item.total_price
-    }))
-
-    const { error: itemsError } = await supabase
-        .from('order_items')
-        .insert(orderItems)
-
-    if (itemsError) throw itemsError
-
-    return order
+    if (criteria.orderNumber) {
+      query = query.ilike('order_number', `%${criteria.orderNumber}%`)
     }
+    
+    if (criteria.customerEmail) {
+      query = query.ilike('customer_email', `%${criteria.customerEmail}%`)
+    }
+    
+    if (criteria.status) {
+      query = query.eq('status', criteria.status)
+    }
+    
+    if (criteria.dateFrom) {
+      query = query.gte('created_at', criteria.dateFrom)
+    }
+    
+    if (criteria.dateTo) {
+      query = query.lte('created_at', criteria.dateTo)
+    }
+
+    const { data, error } = await query.order('created_at', { ascending: false })
+    
+    if (error) throw error
+    return data || []
+  }
 }

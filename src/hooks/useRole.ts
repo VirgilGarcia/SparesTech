@@ -6,7 +6,8 @@ interface UserProfile {
   id: string
   email: string
   company_name: string | null
-  role: 'client' | 'admin' | 'super_admin'
+  role: 'admin' | 'client'
+  tenant_id?: string | null
   is_active: boolean
 }
 
@@ -41,7 +42,7 @@ export function useRole() {
     }
   }
 
-  const isAdmin = profile?.role === 'admin' || profile?.role === 'super_admin'
+  const isAdmin = profile?.role === 'admin'
   const isClient = profile?.role === 'client'
 
   return {
