@@ -6,8 +6,10 @@ import { MarketplaceProvider } from './context/ThemeContext'
 import { RegisterGuard } from './components/RegisterGuard'
 import { PrivateRoute } from './components/PrivateRoute'
 import { RequireAuth } from './components/RequireAuth'
+
 import Home from './pages/Home'
 import Catalog from './pages/Catalog'
+import ProductDetail from './pages/ProductDetail'
 import Cart from './pages/Cart'
 import Login from './pages/Login'
 import Register from './pages/Register'
@@ -15,11 +17,13 @@ import Checkout from './pages/Checkout'
 import OrderSuccess from './pages/OrderSuccess'
 import AdminDashboard from './pages/admin/Dashboard'
 import AdminProducts from './pages/admin/Products'
+import AdminCategories from './pages/admin/Categories'
 import AdminOrders from './pages/admin/Orders'
 import OrderDetail from './pages/admin/OrderDetail'
 import AddProduct from './pages/admin/AddProduct'
 import EditProduct from './pages/admin/EditProduct'
 import AdminSettings from './pages/admin/Settings'
+import ProductStructure from './pages/admin/ProductStructure'
 import AdminUsers from './pages/admin/Users'
 import Profile from './pages/Profile'
 import Orders from './pages/Orders'
@@ -52,6 +56,12 @@ function App() {
               <Route path="/catalog" element={
                 <PrivateRoute>
                   <Catalog />
+                </PrivateRoute>
+              } />
+              
+              <Route path="/product/:id" element={
+                <PrivateRoute>
+                  <ProductDetail />
                 </PrivateRoute>
               } />
               
@@ -102,6 +112,12 @@ function App() {
                 </RequireAuth>
               } />
               
+              <Route path="/admin/categories" element={
+                <RequireAuth>
+                  <AdminCategories />
+                </RequireAuth>
+              } />
+              
               <Route path="/admin/orders" element={
                 <RequireAuth>
                   <AdminOrders />
@@ -117,6 +133,12 @@ function App() {
               <Route path="/admin/settings" element={
                 <RequireAuth>
                   <AdminSettings />
+                </RequireAuth>
+              } />
+
+              <Route path="/admin/product-structure" element={
+                <RequireAuth>
+                  <ProductStructure />
                 </RequireAuth>
               } />
 

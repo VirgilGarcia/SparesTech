@@ -15,9 +15,8 @@ interface MarketplaceContextType {
   display: {
     showPrices: boolean
     showStock: boolean
-    showReferences: boolean
-    showDescriptions: boolean
     showCategories: boolean
+    catalogDisplayMode: string
   }
   access: {
     isPublic: boolean

@@ -30,8 +30,7 @@ export function PrivateRoute({ children }: PrivateRouteProps) {
       console.error('Erreur lors du chargement des paramètres:', error)
       // En cas d'erreur, considérer comme privé par sécurité
       setSettings({ 
-        public_access: false,
-        allow_public_registration: false
+        public_access: false
       } as MarketplaceSettings)
     } finally {
       setSettingsLoading(false)

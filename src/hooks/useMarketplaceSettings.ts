@@ -20,10 +20,10 @@ export function useMarketplaceSettings() {
   const loadSettings = async () => {
     try {
       setLoading(true)
-      console.log('🔄 Chargement settings pour user:', user!.id)
+  
       
       const data = await settingsService.getSettings(user!.id)
-      console.log('📊 Settings récupérés:', data)
+  
       
       setSettings(data)
     } catch (error) {
@@ -38,7 +38,7 @@ export function useMarketplaceSettings() {
     if (!user || !settings) return
 
     try {
-      console.log('💾 Sauvegarde settings:', updates)
+  
       const updated = await settingsService.updateSettings(user.id, updates)
       setSettings(updated)
       return updated

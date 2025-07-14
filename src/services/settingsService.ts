@@ -6,28 +6,14 @@ export interface MarketplaceSettings {
   id?: string
   user_id?: string
   public_access: boolean
-  allow_public_registration: boolean
   show_prices: boolean
   show_stock: boolean
-  show_references: boolean
-  show_descriptions: boolean
   show_categories: boolean
-  // Nouvelles options d'affichage produits
-  show_weight: boolean
-  show_dimensions: boolean
-  show_sku: boolean
-  show_brand: boolean
-  show_supplier: boolean
-  show_technical_specs: boolean
-  show_warranty: boolean
-  show_delivery_info: boolean
-  // Options de visibilité produits
-  allow_product_visibility_toggle: boolean
-  default_product_visibility: boolean
   company_name: string | null
   logo_url: string | null
   primary_color: string
   secondary_color: string
+  catalog_display_mode: string
   created_at?: string
   updated_at?: string
 }
@@ -37,7 +23,7 @@ export const settingsService = {
   getSettings: async (userId: string): Promise<MarketplaceSettings> => {
     const { data, error } = await supabase
       .from('marketplace_settings')
-      .select('*')
+      .select('id, user_id, public_access, show_prices, show_stock, show_categories, company_name, logo_url, primary_color, secondary_color, catalog_display_mode, created_at, updated_at')
       .eq('user_id', userId)
       .single()
 
@@ -46,28 +32,14 @@ export const settingsService = {
       const defaultSettings = {
         user_id: userId,
         public_access: true,
-        allow_public_registration: true,
         show_prices: true,
         show_stock: true,
-        show_references: true,
-        show_descriptions: true,
         show_categories: true,
-        // Nouvelles options d'affichage produits
-        show_weight: false,
-        show_dimensions: false,
-        show_sku: true,
-        show_brand: false,
-        show_supplier: false,
-        show_technical_specs: false,
-        show_warranty: false,
-        show_delivery_info: true,
-        // Options de visibilité produits
-        allow_product_visibility_toggle: true,
-        default_product_visibility: true,
         company_name: '',
         logo_url: null,
         primary_color: '#10b981',
-        secondary_color: '#f3f4f6'
+        secondary_color: '#f3f4f6',
+        catalog_display_mode: 'subcategories_only'
       }
 
       const { data: newSettings, error: createError } = await supabase
@@ -89,7 +61,7 @@ export const settingsService = {
       .from('marketplace_settings')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('user_id', userId)
-      .select()
+      .select('id, user_id, public_access, show_prices, show_stock, show_categories, company_name, logo_url, primary_color, secondary_color, catalog_display_mode, created_at, updated_at')
       .single()
 
     if (error) throw error
@@ -99,34 +71,12 @@ export const settingsService = {
   // Récupérer les paramètres publics (sans authentification)
   getPublicSettings: async (): Promise<MarketplaceSettings> => {
     try {
-      console.log('🔍 Récupération des paramètres publics...')
+  
       
       // Récupérer les paramètres généraux (premier enregistrement trouvé)
       const { data, error } = await supabase
         .from('marketplace_settings')
-        .select(`
-          public_access,
-          allow_public_registration,
-          company_name,
-          logo_url,
-          primary_color,
-          secondary_color,
-          show_prices,
-          show_stock,
-          show_references,
-          show_descriptions,
-          show_categories,
-          show_weight,
-          show_dimensions,
-          show_sku,
-          show_brand,
-          show_supplier,
-          show_technical_specs,
-          show_warranty,
-          show_delivery_info,
-          allow_product_visibility_toggle,
-          default_product_visibility
-        `)
+        .select('id, user_id, public_access, show_prices, show_stock, show_categories, company_name, logo_url, primary_color, secondary_color, catalog_display_mode, created_at, updated_at')
         .limit(1)
         .single()
 
@@ -136,32 +86,18 @@ export const settingsService = {
         // Valeurs par défaut sécurisées en cas d'absence de configuration
         return {
           public_access: false, // Par défaut privé pour la sécurité
-          allow_public_registration: false, // Par défaut fermé
           company_name: 'Marketplace',
           logo_url: null,
           primary_color: '#10b981',
           secondary_color: '#f3f4f6',
           show_prices: true,
           show_stock: true,
-          show_references: true,
-          show_descriptions: true,
           show_categories: true,
-          // Nouvelles options d'affichage produits
-          show_weight: false,
-          show_dimensions: false,
-          show_sku: true,
-          show_brand: false,
-          show_supplier: false,
-          show_technical_specs: false,
-          show_warranty: false,
-          show_delivery_info: true,
-          // Options de visibilité produits
-          allow_product_visibility_toggle: true,
-          default_product_visibility: true
+          catalog_display_mode: 'subcategories_only'
         }
       }
 
-      console.log('✅ Paramètres publics récupérés:', data)
+  
       return data
 
     } catch (error) {
@@ -170,28 +106,14 @@ export const settingsService = {
       // En cas d'erreur réseau, valeurs par défaut sécurisées
       return {
         public_access: false,
-        allow_public_registration: false,
         company_name: 'Marketplace',
         logo_url: null,
         primary_color: '#10b981',
         secondary_color: '#f3f4f6',
         show_prices: true,
         show_stock: true,
-        show_references: true,
-        show_descriptions: true,
         show_categories: true,
-        // Nouvelles options d'affichage produits
-        show_weight: false,
-        show_dimensions: false,
-        show_sku: true,
-        show_brand: false,
-        show_supplier: false,
-        show_technical_specs: false,
-        show_warranty: false,
-        show_delivery_info: true,
-        // Options de visibilité produits
-        allow_product_visibility_toggle: true,
-        default_product_visibility: true
+        catalog_display_mode: 'subcategories_only'
       }
     }
   },

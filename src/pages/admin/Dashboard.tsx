@@ -3,8 +3,10 @@ import { useAuth } from '../../context/AuthContext'
 import { Navigate } from 'react-router-dom'
 import { productService } from '../../services/productService'
 import { orderService } from '../../services/orderService'
+import { categoryService } from '../../services/categoryService'
 import { supabase } from '../../lib/supabase'
 import Header from '../../components/Header'
+import { productStructureService } from '../../services/productStructureService'
 
 // Types pour les composants de graphiques
 interface CircularProgressProps {
@@ -78,6 +80,21 @@ function AdminDashboard() {
   const loadStats = async () => {
     try {
       setLoading(true)
+      
+      // Vérifier et initialiser les catégories si nécessaire
+      const hasCategories = await categoryService.hasCategories()
+      if (!hasCategories) {
+
+        await categoryService.initializeDefaultCategories()
+      }
+
+      // Vérifier et initialiser les champs système si nécessaire
+      const hasSystemFields = await productStructureService.hasSystemFields()
+      if (!hasSystemFields) {
+
+        await productStructureService.initializeSystemFields()
+      }
+      
       const [products, orders] = await Promise.all([
         productService.getAllProducts(),
         orderService.getAllOrders()
@@ -314,6 +331,10 @@ function AdminDashboard() {
             <a href="/admin/users" className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
               <div className="text-2xl">👤</div>
               <p className="text-sm font-medium text-gray-900">Utilisateurs</p>
+            </a>
+            <a href="/admin/categories" className="flex flex-col items-center justify-center gap-2 p-4 rounded-lg border border-gray-200 hover:bg-gray-50 transition-colors">
+              <div className="text-2xl">🏷️</div>
+              <p className="text-sm font-medium text-gray-900">Catégories</p>
             </a>
           </div>
         </div>

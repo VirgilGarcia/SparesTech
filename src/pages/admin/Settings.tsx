@@ -1,6 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
+import { useTheme } from '../../context/ThemeContext'
 import { settingsService } from '../../services/settingsService'
 import type { MarketplaceSettings } from '../../services/settingsService'
 import { supabase } from '../../lib/supabase'
@@ -8,6 +9,7 @@ import Header from '../../components/Header'
 
 function AdminSettings() {
   const { user, loading: authLoading } = useAuth()
+  const { theme } = useTheme()
   const [userRole, setUserRole] = useState<string | null>(null)
   const [roleLoading, setRoleLoading] = useState(false)
   const [settings, setSettings] = useState<MarketplaceSettings | null>(null)
@@ -18,32 +20,8 @@ function AdminSettings() {
 
   // États du formulaire
   const [formData, setFormData] = useState({
-    // Accès
     public_access: true,
-    allow_public_registration: true,
-    
-    // Affichage de base
-    show_prices: true,
-    show_stock: true,
-    show_references: true,
-    show_descriptions: true,
-    show_categories: true,
-    
-    // Nouvelles options d'affichage produits
-    show_weight: false,
-    show_dimensions: false,
-    show_sku: true,
-    show_brand: false,
-    show_supplier: false,
-    show_technical_specs: false,
-    show_warranty: false,
-    show_delivery_info: true,
-    
-    // Options de visibilité produits
-    allow_product_visibility_toggle: true,
-    default_product_visibility: true,
-    
-    // Branding
+    catalog_display_mode: 'subcategories_only',
     company_name: '',
     primary_color: '#10b981',
     secondary_color: '#f3f4f6'
@@ -70,24 +48,7 @@ function AdminSettings() {
     if (settings) {
       setFormData({
         public_access: settings.public_access,
-        allow_public_registration: settings.allow_public_registration,
-        show_prices: settings.show_prices,
-        show_stock: settings.show_stock,
-        show_references: settings.show_references,
-        show_descriptions: settings.show_descriptions,
-        show_categories: settings.show_categories,
-        // Nouvelles options d'affichage produits
-        show_weight: settings.show_weight ?? false,
-        show_dimensions: settings.show_dimensions ?? false,
-        show_sku: settings.show_sku ?? true,
-        show_brand: settings.show_brand ?? false,
-        show_supplier: settings.show_supplier ?? false,
-        show_technical_specs: settings.show_technical_specs ?? false,
-        show_warranty: settings.show_warranty ?? false,
-        show_delivery_info: settings.show_delivery_info ?? true,
-        // Options de visibilité produits
-        allow_product_visibility_toggle: settings.allow_product_visibility_toggle ?? true,
-        default_product_visibility: settings.default_product_visibility ?? true,
+        catalog_display_mode: settings.catalog_display_mode || 'subcategories_only',
         company_name: settings.company_name || '',
         primary_color: settings.primary_color,
         secondary_color: settings.secondary_color
@@ -204,7 +165,7 @@ function AdminSettings() {
         logo_url: logoUrl
       }
 
-      console.log('💾 Sauvegarde complète:', updates)
+  
       
       const updated = await settingsService.updateSettings(user.id, updates)
       setSettings(updated)
@@ -227,24 +188,7 @@ function AdminSettings() {
     return (
       logoFile !== null ||
       formData.public_access !== settings.public_access ||
-      formData.allow_public_registration !== settings.allow_public_registration ||
-      formData.show_prices !== settings.show_prices ||
-      formData.show_stock !== settings.show_stock ||
-      formData.show_references !== settings.show_references ||
-      formData.show_descriptions !== settings.show_descriptions ||
-      formData.show_categories !== settings.show_categories ||
-      // Nouvelles options d'affichage produits
-      formData.show_weight !== (settings.show_weight ?? false) ||
-      formData.show_dimensions !== (settings.show_dimensions ?? false) ||
-      formData.show_sku !== (settings.show_sku ?? true) ||
-      formData.show_brand !== (settings.show_brand ?? false) ||
-      formData.show_supplier !== (settings.show_supplier ?? false) ||
-      formData.show_technical_specs !== (settings.show_technical_specs ?? false) ||
-      formData.show_warranty !== (settings.show_warranty ?? false) ||
-      formData.show_delivery_info !== (settings.show_delivery_info ?? true) ||
-      // Options de visibilité produits
-      formData.allow_product_visibility_toggle !== (settings.allow_product_visibility_toggle ?? true) ||
-      formData.default_product_visibility !== (settings.default_product_visibility ?? true) ||
+      formData.catalog_display_mode !== settings.catalog_display_mode ||
       formData.company_name !== (settings.company_name || '') ||
       formData.primary_color !== settings.primary_color ||
       formData.secondary_color !== settings.secondary_color
@@ -444,7 +388,7 @@ function AdminSettings() {
             <h2 className="text-lg font-bold text-gray-900 mb-4">🔐 Accès</h2>
             
             <div className="space-y-4">
-              {/* Mode public/privé */}
+              {/* Mode d'accès */}
               <div>
                 <label className="text-sm font-semibold text-gray-900 mb-2 block">
                   Mode d'accès
@@ -460,7 +404,7 @@ function AdminSettings() {
                     <div>
                       <div className="font-medium text-gray-900 text-sm">🌐 Public</div>
                       <div className="text-xs text-gray-600">
-                        Accès libre au marketplace
+                        Accès libre au marketplace • Inscription publique autorisée
                       </div>
                     </div>
                   </label>
@@ -475,295 +419,79 @@ function AdminSettings() {
                     <div>
                       <div className="font-medium text-gray-900 text-sm">🔒 Privé</div>
                       <div className="text-xs text-gray-600">
-                        Connexion obligatoire
+                        Connexion obligatoire • Seuls les admins peuvent créer des comptes
                       </div>
                     </div>
                   </label>
                 </div>
               </div>
 
-              {/* Inscription publique */}
+              {/* Mode d'affichage du catalogue */}
               <div>
-                <label className="text-sm font-semibold text-gray-900 mb-2 block">
-                  Inscription
+                <label htmlFor="catalog_display_mode" className="block text-sm font-semibold text-gray-900 mb-2">
+                  Mode d'affichage du catalogue
                 </label>
-                <div className="space-y-2">
-                  <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      checked={formData.allow_public_registration}
-                      onChange={() => setFormData(prev => ({ ...prev, allow_public_registration: true }))}
-                      className="text-blue-600 mt-0.5"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-900 text-sm">✅ Libre</div>
-                      <div className="text-xs text-gray-600">
-                        Inscription publique
-                      </div>
-                    </div>
-                  </label>
-                  
-                  <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      checked={!formData.allow_public_registration}
-                      onChange={() => setFormData(prev => ({ ...prev, allow_public_registration: false }))}
-                      className="text-blue-600 mt-0.5"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-900 text-sm">🛡️ Contrôlée</div>
-                      <div className="text-xs text-gray-600">
-                        Admins seulement
-                      </div>
-                    </div>
-                  </label>
-                </div>
+                <select
+                  id="catalog_display_mode"
+                  value={formData.catalog_display_mode || 'subcategories_only'}
+                  onChange={e => setFormData(prev => ({ ...prev, catalog_display_mode: e.target.value }))}
+                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                >
+                  <option value="subcategories_only">Afficher uniquement les sous-catégories si elles existent</option>
+                  <option value="subcategories_and_products">Afficher sous-catégories et articles</option>
+                </select>
+                <p className="text-xs text-gray-500 mt-1">
+                  Contrôle l'affichage du catalogue selon la structure de tes catégories.
+                </p>
               </div>
             </div>
           </div>
 
-          {/* Affichage des produits */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 lg:col-span-2">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">📦 Affichage Produits</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Choisissez les informations à afficher
-            </p>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-3">
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_prices}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_prices: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">💰 Prix</div>
-                </div>
-              </label>
 
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_stock}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_stock: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">📦 Stock</div>
-                </div>
-              </label>
+        </div>
 
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_references}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_references: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">🏷️ Références</div>
-                </div>
-              </label>
-
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_descriptions}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_descriptions: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">📝 Descriptions</div>
-                </div>
-              </label>
-
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_categories}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_categories: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">📁 Catégories</div>
-                </div>
-              </label>
+        {/* Gestion de la structure des produits */}
+        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 lg:col-span-2 mt-6">
+          <div className="flex items-center justify-between mb-4">
+            <div>
+              <h2 className="text-lg font-bold text-gray-900">🏗️ Structure des Produits</h2>
+              <p className="text-sm text-gray-600 mt-1">
+                Personnalisez la structure de vos produits selon vos besoins métier
+              </p>
             </div>
+            <Link
+              to="/admin/product-structure"
+              className="inline-flex items-center px-4 py-2 border border-transparent rounded-md shadow-sm text-sm font-medium text-white hover:opacity-90 transition-colors"
+              style={{ backgroundColor: theme.primaryColor }}
+            >
+              🛠️ Gérer la structure
+            </Link>
           </div>
-
-          {/* Nouvelles options d'affichage produits */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 lg:col-span-2">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">🔧 Informations Techniques</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Options d'affichage pour les détails techniques des produits
-            </p>
-            
-            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3">
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_weight}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_weight: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">⚖️ Poids</div>
-                </div>
-              </label>
-
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_dimensions}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_dimensions: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">📏 Dimensions</div>
-                </div>
-              </label>
-
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_sku}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_sku: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">🏷️ SKU</div>
-                </div>
-              </label>
-
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_brand}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_brand: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">🏭 Marque</div>
-                </div>
-              </label>
-
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_supplier}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_supplier: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">🏢 Fournisseur</div>
-                </div>
-              </label>
-
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_technical_specs}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_technical_specs: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">⚙️ Spécifications</div>
-                </div>
-              </label>
-
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_warranty}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_warranty: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">🛡️ Garantie</div>
-                </div>
-              </label>
-
-              <label className="flex items-start space-x-2 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                <input
-                  type="checkbox"
-                  checked={formData.show_delivery_info}
-                  onChange={(e) => setFormData(prev => ({ ...prev, show_delivery_info: e.target.checked }))}
-                  className="text-blue-600 mt-0.5"
-                />
-                <div>
-                  <div className="font-medium text-gray-900 text-sm">🚚 Livraison</div>
-                </div>
-              </label>
-            </div>
-          </div>
-
-          {/* Options de visibilité produits */}
-          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 lg:col-span-2">
-            <h2 className="text-lg font-bold text-gray-900 mb-4">👁️ Visibilité Produits</h2>
-            <p className="text-sm text-gray-600 mb-4">
-              Contrôlez la visibilité des produits sur le marketplace
-            </p>
-            
-            <div className="space-y-4">
-              {/* Activer le toggle de visibilité */}
+          
+          <div className="bg-gray-50 rounded-lg p-4">
+            <div className="flex items-start space-x-3">
+              <div className="flex-shrink-0">
+                <span className="text-emerald-500 text-lg">💡</span>
+              </div>
               <div>
-                <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                  <input
-                    type="checkbox"
-                    checked={formData.allow_product_visibility_toggle}
-                    onChange={(e) => setFormData(prev => ({ ...prev, allow_product_visibility_toggle: e.target.checked }))}
-                    className="text-blue-600 mt-0.5"
-                  />
-                  <div>
-                    <div className="font-medium text-gray-900 text-sm">🎛️ Activer le contrôle de visibilité</div>
-                    <div className="text-xs text-gray-600">
-                      Permettre de rendre les produits invisibles ou invendables
-                    </div>
-                  </div>
-                </label>
-              </div>
-
-              {/* Visibilité par défaut */}
-              <div>
-                <label className="text-sm font-semibold text-gray-900 mb-2 block">
-                  Visibilité par défaut des nouveaux produits
-                </label>
-                <div className="space-y-2">
-                  <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      checked={formData.default_product_visibility}
-                      onChange={() => setFormData(prev => ({ ...prev, default_product_visibility: true }))}
-                      className="text-blue-600 mt-0.5"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-900 text-sm">✅ Visible</div>
-                      <div className="text-xs text-gray-600">
-                        Nouveaux produits visibles par défaut
-                      </div>
-                    </div>
-                  </label>
-                  
-                  <label className="flex items-start space-x-3 cursor-pointer p-3 rounded-lg border hover:bg-gray-50 transition-colors">
-                    <input
-                      type="radio"
-                      checked={!formData.default_product_visibility}
-                      onChange={() => setFormData(prev => ({ ...prev, default_product_visibility: false }))}
-                      className="text-blue-600 mt-0.5"
-                    />
-                    <div>
-                      <div className="font-medium text-gray-900 text-sm">🚫 Masqué</div>
-                      <div className="text-xs text-gray-600">
-                        Nouveaux produits masqués par défaut
-                      </div>
-                    </div>
-                  </label>
-                </div>
+                <h3 className="text-sm font-medium text-gray-900 mb-1">Personnalisation avancée</h3>
+                <p className="text-sm text-gray-600">
+                  Créez vos propres champs de produits, choisissez leur type (texte, nombre, liste, etc.) 
+                  et configurez leur affichage dans le catalogue et les pages de détail.
+                </p>
               </div>
             </div>
           </div>
+        </div>
 
+        {/* Navigation */}
+        <div className="mt-8">
+          <Link
+            to="/admin"
+            className="inline-flex items-center text-sm text-gray-600 hover:text-gray-900 transition-colors"
+          >
+            ← Retour au tableau de bord
+          </Link>
         </div>
       </div>
     </div>

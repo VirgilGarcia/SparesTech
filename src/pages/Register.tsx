@@ -2,6 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Header from '../components/Header'
+import { useTheme } from '../context/ThemeContext'
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -16,6 +17,7 @@ function Register() {
   
   const { signUp } = useAuth()
   const navigate = useNavigate()
+  const { theme } = useTheme()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({
@@ -68,8 +70,16 @@ function Register() {
       <div className="max-w-md mx-auto px-6 py-12">
         <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-8">
           <div className="text-center mb-8">
-            <h1 className="text-3xl font-bold text-stone-800 mb-2">Inscription</h1>
-            <p className="text-stone-600">Créez votre compte professionnel</p>
+            {theme.logoUrl && (
+              <img
+                src={theme.logoUrl}
+                alt={theme.companyName}
+                className="h-14 mx-auto mb-3 object-contain"
+                style={{ maxWidth: 120 }}
+              />
+            )}
+            <h1 className="text-3xl font-bold mb-1" style={{ color: theme.primaryColor }}>{theme.companyName}</h1>
+            <div className="text-stone-600 mb-2">Créez votre compte professionnel</div>
           </div>
 
           {error && (
@@ -89,9 +99,10 @@ function Register() {
                 name="company"
                 value={formData.company}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors"
+                className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                 placeholder="Nom de votre entreprise"
                 required
+                style={{ borderColor: theme.primaryColor }}
               />
             </div>
             
@@ -105,9 +116,10 @@ function Register() {
                 name="email"
                 value={formData.email}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors"
+                className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                 placeholder="votre@entreprise.com"
                 required
+                style={{ borderColor: theme.primaryColor }}
               />
             </div>
             
@@ -121,9 +133,10 @@ function Register() {
                 name="password"
                 value={formData.password}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors"
+                className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                 placeholder="••••••••"
                 required
+                style={{ borderColor: theme.primaryColor }}
               />
             </div>
             
@@ -137,9 +150,10 @@ function Register() {
                 name="confirmPassword"
                 value={formData.confirmPassword}
                 onChange={handleChange}
-                className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:outline-none focus:border-emerald-500 transition-colors"
+                className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-emerald-500 focus:border-emerald-500 transition-colors"
                 placeholder="••••••••"
                 required
+                style={{ borderColor: theme.primaryColor }}
               />
             </div>
             
@@ -149,8 +163,9 @@ function Register() {
               className={`w-full py-3 rounded-xl font-medium transition-colors ${
                 loading
                   ? 'bg-stone-300 text-stone-500 cursor-not-allowed'
-                  : 'bg-emerald-500 text-white hover:bg-emerald-600'
+                  : 'text-white hover:opacity-90'
               }`}
+              style={{ backgroundColor: loading ? undefined : theme.primaryColor }}
             >
               {loading ? 'Inscription...' : 'Créer mon compte'}
             </button>
@@ -159,7 +174,7 @@ function Register() {
           <div className="mt-6 text-center">
             <p className="text-stone-600">
               Déjà un compte ?{' '}
-              <Link to="/login" className="text-emerald-600 hover:text-emerald-700 font-medium">
+              <Link to="/login" className="font-medium" style={{ color: theme.primaryColor }}>
                 Se connecter
               </Link>
             </p>

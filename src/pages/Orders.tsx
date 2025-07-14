@@ -53,7 +53,7 @@ function Orders() {
       setLoading(true)
       
       // D'abord, essayons de récupérer les commandes avec une requête plus simple
-      console.log('🔍 Chargement des commandes pour l\'utilisateur:', user!.id)
+  
       
       const { data: ordersData, error: ordersError } = await supabase
         .from('orders')
@@ -63,7 +63,7 @@ function Orders() {
 
       if (ordersError) throw ordersError
       
-      console.log('📦 Commandes brutes:', ordersData)
+  
 
       // Ensuite, pour chaque commande, récupérer les items avec les produits
       const ordersWithItems = await Promise.all(
@@ -83,7 +83,7 @@ function Orders() {
             }
           }
 
-          console.log('📋 Items pour commande', order.id, ':', itemsData)
+  
 
           // Pour chaque item, récupérer le produit correspondant
           const itemsWithProducts = await Promise.all(
@@ -105,7 +105,7 @@ function Orders() {
                 }
               }
 
-              console.log('🏷️ Produit trouvé pour item', item.id, ':', productData)
+  
 
               return {
                 ...item,
@@ -122,7 +122,7 @@ function Orders() {
         })
       )
 
-      console.log('✅ Commandes finales avec produits:', ordersWithItems)
+  
       setOrders(ordersWithItems)
       
     } catch (error: any) {

@@ -142,7 +142,7 @@ function AdminUsers() {
         throw new Error('Aucun utilisateur créé')
       }
 
-      console.log('✅ Utilisateur auth créé:', authData.user.id)
+      
 
       // Attendre que le trigger crée le profil, puis le mettre à jour avec le bon rôle
       let retries = 0
@@ -160,7 +160,7 @@ function AdminUsers() {
             .eq('id', authData.user.id)
 
           if (!updateError) {
-            console.log('✅ Profil utilisateur mis à jour')
+    
             break
           }
           
@@ -178,7 +178,7 @@ function AdminUsers() {
               })
 
             if (!insertError) {
-              console.log('✅ Profil utilisateur créé manuellement')
+      
               break
             }
           }
@@ -339,18 +339,16 @@ function AdminUsers() {
             <h1 className="text-2xl font-bold text-gray-900 mb-1">Utilisateurs</h1>
             <p className="text-sm text-gray-600">Gestion des comptes et rôles</p>
           </div>
-          {settings && !settings.allow_public_registration && (
-            <button
-              onClick={() => setShowCreateForm(true)}
-              className="flex items-center space-x-2 text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-colors text-sm"
-              style={{ backgroundColor: theme.primaryColor }}
-            >
-              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-              </svg>
-              <span>Ajouter un utilisateur</span>
-            </button>
-          )}
+          <button
+            onClick={() => setShowCreateForm(true)}
+            className="flex items-center space-x-2 text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-colors text-sm"
+            style={{ backgroundColor: theme.primaryColor }}
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+            </svg>
+            <span>Ajouter un utilisateur</span>
+          </button>
         </div>
 
         {/* Messages */}
@@ -365,26 +363,32 @@ function AdminUsers() {
           </div>
         )}
 
-        {/* Info mode inscription */}
-        {settings?.allow_public_registration && (
-          <div className="mb-6 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-            <div className="flex items-start space-x-3">
-              <svg className="w-5 h-5 text-blue-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+        {/* Information sur le mode d'accès */}
+        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
+          <div className="flex items-start">
+            <div className="flex-shrink-0">
+              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
+                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
               </svg>
-              <div>
-                <p className="text-blue-800 font-medium text-sm">Mode inscription publique activé</p>
-                <p className="text-blue-600 text-xs mt-1">
-                  Les clients peuvent créer leurs comptes eux-mêmes. 
-                  <Link to="/admin/settings" className="underline ml-1">Modifier dans les paramètres</Link>
+            </div>
+            <div className="ml-3">
+              <h3 className="text-sm font-medium text-blue-800">
+                {settings?.public_access ? "Mode d'accès : Public" : "Mode d'accès : Privé"}
+              </h3>
+              <div className="mt-2 text-sm text-blue-700">
+                <p>
+                  {settings?.public_access 
+                    ? "Les utilisateurs peuvent s'inscrire eux-mêmes. Vous pouvez aussi créer des comptes manuellement avec le bouton ci-dessus."
+                    : "Ce marketplace étant en mode privé, seuls les administrateurs peuvent créer des comptes utilisateurs."
+                  }
                 </p>
               </div>
             </div>
           </div>
-        )}
+        </div>
 
-        {/* Formulaire de création */}
-        {showCreateForm && settings && !settings.allow_public_registration && (
+        {/* Formulaire de création de compte - toujours disponible pour les admins */}
+        {showCreateForm && (
           <div className="mb-8 bg-white rounded-lg border border-gray-100 p-6 shadow-sm">
             <div className="flex items-center justify-between mb-6">
               <h2 className="text-lg font-bold text-gray-900">Créer un nouvel utilisateur</h2>

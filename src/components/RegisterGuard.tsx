@@ -25,7 +25,7 @@ export function RegisterGuard({ children }: RegisterGuardProps) {
       console.error('Erreur lors du chargement des paramètres:', error)
       // En cas d'erreur, bloquer l'inscription par sécurité
       setSettings({ 
-        allow_public_registration: false,
+        public_access: false,
         company_name: 'Marketplace'
       } as MarketplaceSettings)
     } finally {
@@ -45,8 +45,8 @@ export function RegisterGuard({ children }: RegisterGuardProps) {
     )
   }
 
-  // Si l'inscription publique est désactivée
-  if (settings && !settings.allow_public_registration) {
+  // Si le marketplace est en mode privé (inscription contrôlée)
+  if (settings && !settings.public_access) {
     return (
       <div className="min-h-screen bg-stone-50 flex items-center justify-center">
         <div className="text-center max-w-md mx-auto p-8">
@@ -62,8 +62,8 @@ export function RegisterGuard({ children }: RegisterGuardProps) {
             </h1>
             
             <p className="text-stone-600 mb-6 leading-relaxed">
-              Les inscriptions sont actuellement désactivées sur <strong>{settings.company_name || 'ce marketplace'}</strong>. 
-              Pour obtenir un compte, veuillez contacter l'administrateur.
+              Ce marketplace est en mode privé. Les inscriptions sont contrôlées par l'administrateur. 
+              Pour obtenir un compte, veuillez contacter l'administrateur de <strong>{settings.company_name || 'ce marketplace'}</strong>.
             </p>
             
             <div className="space-y-3">

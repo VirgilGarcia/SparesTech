@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { productService } from '../../services/productService'
-import type { ProductDB } from '../../services/productService'
+import type { Product } from '../../services/productService'
 import { useAuth } from '../../context/AuthContext'
 import { Navigate } from 'react-router-dom'
 import Header from '../../components/Header'
@@ -10,7 +10,7 @@ import { useTheme } from '../../context/ThemeContext'
 function AdminProducts() {
   const { user, loading: authLoading } = useAuth()
   const { theme } = useTheme()
-  const [products, setProducts] = useState<ProductDB[]>([])
+  const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
 
@@ -23,7 +23,7 @@ function AdminProducts() {
   const loadProducts = async () => {
     try {
       setLoading(true)
-      const data = await productService.getAllProductsAdmin()
+      const data = await productService.getAllProducts()
       setProducts(data)
     } catch (error) {
       console.error('Erreur lors du chargement des produits:', error)
@@ -32,7 +32,7 @@ function AdminProducts() {
     }
   }
 
-  const handleDelete = async (id: number) => {
+  const handleDelete = async (id: string) => {
     if (!confirm('Êtes-vous sûr de vouloir supprimer ce produit ?')) return
 
     try {
@@ -122,16 +122,30 @@ function AdminProducts() {
                       <tr key={product.id} className="border-t border-gray-100 hover:bg-gray-50">
                         <td className="p-3">
                           <div className="font-medium text-gray-900 text-sm">{product.name}</div>
-                          <div className="text-xs text-gray-600">{product.description}</div>
                         </td>
                         <td className="p-3 text-gray-600 text-sm">{product.reference}</td>
                         <td className="p-3">
-                          <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
-                            {product.category}
-                          </span>
+                          {product.product_categories && product.product_categories.length > 0 ? (
+                            <div className="flex flex-wrap gap-1">
+                              {product.product_categories.slice(0, 2).map((pc) => (
+                                <span key={pc.id} className="bg-blue-100 text-blue-700 px-2 py-1 rounded text-xs">
+                                  {pc.categories.name}
+                                </span>
+                              ))}
+                              {product.product_categories.length > 2 && (
+                                <span className="bg-gray-100 text-gray-600 px-2 py-1 rounded text-xs">
+                                  +{product.product_categories.length - 2}
+                                </span>
+                              )}
+                            </div>
+                          ) : (
+                            <span className="bg-gray-100 text-gray-700 px-2 py-1 rounded text-xs">
+                              Pas de catégorie
+                            </span>
+                          )}
                         </td>
                         <td className="p-3 font-medium text-sm" style={{ color: theme.primaryColor }}>
-                          {product.price} €
+                          {product.prix} €
                         </td>
                         <td className="p-3">
                           <span className={`px-2 py-1 rounded text-xs ${
@@ -147,18 +161,18 @@ function AdminProducts() {
                         <td className="p-3">
                           <div className="flex flex-col gap-1">
                             <span className={`px-2 py-1 rounded text-xs ${
-                              product.is_visible 
+                              product.visible 
                                 ? 'bg-green-100 text-green-700' 
                                 : 'bg-red-100 text-red-700'
                             }`}>
-                              {product.is_visible ? '👁️ Visible' : '🚫 Masqué'}
+                              {product.visible ? '👁️ Visible' : '🚫 Masqué'}
                             </span>
                             <span className={`px-2 py-1 rounded text-xs ${
-                              product.is_sellable 
+                              product.vendable 
                                 ? 'bg-blue-100 text-blue-700' 
                                 : 'bg-orange-100 text-orange-700'
                             }`}>
-                              {product.is_sellable ? '💰 Vendu' : '⛔ Invendu'}
+                              {product.vendable ? '💰 En vente' : '⛔ Non en vente'}
                             </span>
                           </div>
                         </td>

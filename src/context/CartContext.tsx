@@ -1,12 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
-
-interface Product {
-  id: number
-  name: string
-  reference: string
-  price: number
-}
+import type { Product } from '../services/productService'
 
 interface CartItem extends Product {
   quantity: number
@@ -15,9 +9,9 @@ interface CartItem extends Product {
 interface CartContextType {
   cartItems: CartItem[]
   addToCart: (product: Product) => void
-  removeFromCart: (productId: number) => void
+  removeFromCart: (productId: string) => void
   setCartItems: (items: CartItem[]) => void
-  updateQuantity: (productId: number, quantity: number) => void
+  updateQuantity: (productId: string, quantity: number) => void
   getTotalPrice: () => number
   getTotalItems: () => number
 }
@@ -45,11 +39,11 @@ export function CartProvider({ children }: CartProviderProps) {
     })
   }
 
-  const removeFromCart = (productId: number) => {
+  const removeFromCart = (productId: string) => {
     setCartItems(prev => prev.filter(item => item.id !== productId))
   }
 
-  const updateQuantity = (productId: number, quantity: number) => {
+  const updateQuantity = (productId: string, quantity: number) => {
     if (quantity === 0) {
       removeFromCart(productId)
       return
@@ -62,7 +56,7 @@ export function CartProvider({ children }: CartProviderProps) {
   }
 
   const getTotalPrice = () => {
-    return cartItems.reduce((total, item) => total + (item.price * item.quantity), 0)
+    return cartItems.reduce((total, item) => total + (item.prix * item.quantity), 0)
   }
 
   const getTotalItems = () => {
@@ -92,5 +86,5 @@ export function useCart() {
   return context
 }
 
-// Export du type Product
-export type { Product }
+// Export du type Product depuis le service
+export type { Product } from '../services/productService'

@@ -62,13 +62,12 @@ export function useMarketplaceTheme() {
     display: {
       showPrices: settings?.show_prices ?? true,
       showStock: settings?.show_stock ?? true,
-      showReferences: settings?.show_references ?? true,
-      showDescriptions: settings?.show_descriptions ?? true,
-      showCategories: settings?.show_categories ?? true
+      showCategories: settings?.show_categories ?? true,
+      catalogDisplayMode: settings?.catalog_display_mode || 'subcategories_only'
     },
     access: {
       isPublic: settings?.public_access ?? true,
-      allowRegistration: settings?.allow_public_registration ?? true
+      allowRegistration: settings?.public_access ?? true // Si public, inscription autorisée
     }
   }
 }
