@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { useTheme } from '../../context/ThemeContext'
+import { useMarketplaceTheme } from '../../context/ThemeContext'
 import { supabase } from '../../lib/supabase'
 import { settingsService } from '../../services/settingsService'
 import type { MarketplaceSettings } from '../../services/settingsService'
@@ -16,7 +16,7 @@ interface User {
 
 function AdminUsers() {
   const { user, loading: authLoading } = useAuth()
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   const [userRole, setUserRole] = useState<string | null>(null)
   const [roleLoading, setRoleLoading] = useState(false)
   const [users, setUsers] = useState<User[]>([])

@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import Header from '../components/Header'
 
@@ -19,7 +19,7 @@ interface UserProfile {
 
 function Profile() {
   const { user } = useAuth()
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)

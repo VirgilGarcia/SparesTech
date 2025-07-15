@@ -1,13 +1,13 @@
 import { useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 import Header from '../components/Header'
 import { CheckCircle, Package, Mail, Clock } from 'lucide-react'
 
 function OrderSuccess() {
   const { cartItems, setCartItems } = useCart()
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   const location = useLocation()
   const { orderNumber, totalAmount } = location.state || {}
 

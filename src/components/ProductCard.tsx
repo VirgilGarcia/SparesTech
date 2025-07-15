@@ -1,120 +1,158 @@
-import React, { useState, useEffect } from 'react'
+import React from 'react'
 import { Link } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
-import { useTheme } from '../context/ThemeContext'
-import { productService } from '../services/productService'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 import FieldRenderer from './FieldRenderer'
-import type { Product, ProductFieldDisplay, ProductFieldValue, ProductField } from '../services/productService'
-
-interface ProductFieldValueWithField extends ProductFieldValue {
-  product_fields: ProductField
-}
+import type { Product, ProductFieldDisplay } from '../services/productService'
 
 interface ProductCardProps {
   product: Product
-  showAddToCart?: boolean
-  fieldDisplay?: ProductFieldDisplay[]
+  fieldDisplay?: ProductFieldDisplay
   fieldValues?: { [key: string]: string }
+  onAddToCart?: (product: Product) => void
+  showPrices?: boolean
+  showStock?: boolean
+  userRole?: string | null
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ 
   product, 
-  showAddToCart = true, 
-  fieldDisplay = [], 
-  fieldValues = {} 
+  fieldDisplay = {}, 
+  fieldValues = {},
+  onAddToCart,
+  showPrices = true,
+  showStock = true,
+  userRole
 }) => {
-  const { addToCart } = useCart()
-  const { theme } = useTheme()
-  const [isHovered, setIsHovered] = useState(false)
+  const { theme } = useMarketplaceTheme()
 
-  const shouldShowField = (fieldName: string): boolean => {
-    const field = fieldDisplay.find(f => f.field_name === fieldName)
-    return field ? field.show_in_catalog : true
-  }
-
-  const getFieldValue = (fieldName: string): string | null => {
-    if (fieldDisplay.find(f => f.field_name === fieldName)?.field_type === 'system') {
-      return product[fieldName]?.toString() || null
-    } else {
-      return fieldValues[fieldName] || null
+  const handleAddToCart = () => {
+    if (onAddToCart) {
+      onAddToCart(product)
     }
   }
 
+  const getFieldValue = (fieldName: string): string | null => {
+    // Pour les champs système, prendre directement depuis le produit
+    if (['name', 'reference', 'prix', 'stock'].includes(fieldName)) {
+      return product[fieldName]?.toString() || null
+    }
+    // Pour les champs personnalisés, prendre depuis fieldValues
+    return fieldValues[fieldName] || null
+  }
+
   const getFieldDisplayName = (fieldName: string): string => {
-    const field = fieldDisplay.find(f => f.field_name === fieldName)
-    return field ? field.display_name : fieldName
+    // Pour les champs système, utiliser des noms par défaut
+    const systemFieldNames: { [key: string]: string } = {
+      name: 'Nom',
+      reference: 'Référence',
+      prix: 'Prix',
+      stock: 'Stock'
+    }
+    
+    if (systemFieldNames[fieldName]) {
+      return systemFieldNames[fieldName]
+    }
+    
+    // Pour les champs personnalisés, utiliser fieldDisplay
+    return fieldDisplay[fieldName]?.display_name || fieldName
   }
 
-  const handleAddToCart = () => {
-    addToCart(product)
+  const shouldShowField = (fieldName: string): boolean => {
+    // Les champs système sont toujours affichés sauf si explicitement cachés
+    if (['name', 'reference', 'prix', 'stock'].includes(fieldName)) {
+      if (fieldName === 'prix' && !showPrices) return false
+      if (fieldName === 'stock' && !showStock) return false
+      return true
+    }
+    
+    // Pour les champs personnalisés, vérifier dans fieldDisplay
+    return fieldDisplay[fieldName]?.show_in_catalog ?? true
   }
 
-  // Fonction pour afficher tous les champs dans l'ordre configuré (catalogue)
-  const renderOrderedFields = () => {
-    const allFields = fieldDisplay
-      .filter(display => display.show_in_catalog)
-      .filter(display => !['visible', 'vendable', 'photo_url'].includes(display.field_name))
-      .sort((a, b) => a.catalog_order - b.catalog_order)
+  // Rendu des champs dans l'ordre configuré
+  const renderFields = () => {
+    // Champs système toujours affichés en premier
+    const systemFieldNames = ['name', 'reference', 'prix', 'stock']
+    const systemFields = systemFieldNames
+      .filter(fieldName => shouldShowField(fieldName))
+      .map(fieldName => ({ fieldName, type: 'system' as const, order: systemFieldNames.indexOf(fieldName) }))
 
-    return allFields.map(display => {
-      const value = getFieldValue(display.field_name)
+    // Champs personnalisés depuis fieldDisplay
+    const customFields = Object.entries(fieldDisplay)
+      .filter(([fieldName]) => shouldShowField(fieldName))
+      .filter(([fieldName]) => !['visible', 'vendable', 'photo_url'].includes(fieldName))
+      .map(([fieldName, config]) => ({ 
+        fieldName, 
+        type: 'custom' as const, 
+        order: config.catalog_order || 999 
+      }))
+
+    // Combiner et trier
+    const allFields = [...systemFields, ...customFields]
+      .sort((a, b) => a.order - b.order)
+
+    return allFields.map(({ fieldName, type }) => {
+      const value = getFieldValue(fieldName)
       if (!value) return null
 
-      // Rendu spécial pour certains champs système
-      if (display.field_type === 'system') {
-        if (display.field_name === 'name') {
+      // Rendu spécial pour les champs système
+      if (type === 'system') {
+        if (fieldName === 'name') {
           return (
-            <Link key={display.id} to={`/product/${product.id}`} className="block group">
-              <h3 className="text-sm font-semibold text-gray-900 transition-all duration-200 group-hover:opacity-80 line-clamp-2 leading-tight">
+            <Link key={fieldName} to={`/product/${product.id}`} className="block group">
+              <h3 className="text-lg font-medium text-gray-900 group-hover:text-gray-700 transition-colors line-clamp-2 leading-tight">
                 {value}
               </h3>
             </Link>
           )
         }
-        if (display.field_name === 'reference') {
+        if (fieldName === 'reference') {
           return (
-            <div key={display.id} className="flex items-center gap-1 text-xs text-gray-500">
-              <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <div key={fieldName} className="flex items-center gap-2 text-sm text-gray-500">
+              <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6a2 2 0 012-2h2a2 2 0 012 2v6" />
               </svg>
               <span className="font-mono">{value}</span>
             </div>
           )
         }
-        if (display.field_name === 'prix') {
+        if (fieldName === 'prix' && showPrices) {
           return (
-            <div key={display.id} className="text-lg font-bold" style={{ color: theme.primaryColor }}>
+            <div key={fieldName} className="text-2xl font-bold" style={{ color: theme.primaryColor }}>
               {value}€
             </div>
           )
         }
-        if (display.field_name === 'stock') {
+        if (fieldName === 'stock' && showStock) {
+          const stockLevel = product.stock > 10 ? 'high' : product.stock > 0 ? 'low' : 'out'
+          const stockConfig = {
+            high: { bg: 'bg-green-50', text: 'text-green-700', dot: 'bg-green-500' },
+            low: { bg: 'bg-yellow-50', text: 'text-yellow-700', dot: 'bg-yellow-500' },
+            out: { bg: 'bg-red-50', text: 'text-red-700', dot: 'bg-red-500' }
+          }
+          const config = stockConfig[stockLevel]
+          
           return (
-            <div key={display.id} className={`inline-flex items-center gap-1 px-2 py-1 rounded-full text-xs font-medium ${
-              product.stock > 10 
-                ? 'bg-green-100 text-green-700' 
-                : product.stock > 0 
-                ? 'bg-yellow-100 text-yellow-700' 
-                : 'bg-red-100 text-red-700'
-            }`}>
-              <div className={`w-1.5 h-1.5 rounded-full ${
-                product.stock > 10 ? 'bg-green-500' : product.stock > 0 ? 'bg-yellow-500' : 'bg-red-500'
-              }`}></div>
-              {product.stock > 0 ? `${value}` : 'Rupture'}
+            <div key={fieldName} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${config.bg} ${config.text}`}>
+              <div className={`w-2 h-2 rounded-full ${config.dot}`}></div>
+              {product.stock > 0 ? `${value} en stock` : 'Rupture de stock'}
             </div>
           )
         }
-        // Autres champs système (fallback)
+        // Autres champs système
         return (
-          <div key={display.id} className="text-xs text-gray-600">
-            <span className="font-medium text-gray-700">{getFieldDisplayName(display.field_name)}:</span> {value}
+          <div key={fieldName} className="text-sm text-gray-600">
+            <span className="font-medium text-gray-700">{getFieldDisplayName(fieldName)}:</span> {value}
           </div>
         )
       } else {
-        // Champs custom : utiliser FieldRenderer si besoin
+        // Champs personnalisés
+        const fieldConfig = fieldDisplay[fieldName]
         return (
-          <div key={display.id} className="text-xs text-gray-600">
-            <span className="font-medium text-gray-700">{getFieldDisplayName(display.field_name)}:</span> <FieldRenderer type={display.field_type} value={value} />
+          <div key={fieldName} className="text-sm text-gray-600">
+            <span className="font-medium text-gray-700">{getFieldDisplayName(fieldName)}:</span> 
+            <FieldRenderer type={fieldConfig.field_type} value={value} />
           </div>
         )
       }
@@ -122,103 +160,78 @@ const ProductCard: React.FC<ProductCardProps> = ({
   }
 
   return (
-    <div 
-      className="group bg-white rounded-lg shadow-sm hover:shadow-md transition-all duration-200 overflow-hidden border border-gray-100 hover:border-gray-200"
-      onMouseEnter={() => setIsHovered(true)}
-      onMouseLeave={() => setIsHovered(false)}
-    >
-      {/* Image avec overlay */}
+    <div className="bg-white rounded-lg border border-gray-100 overflow-hidden shadow-sm">
+      {/* Image */}
       <div className="relative overflow-hidden">
-        <div className="aspect-square bg-gradient-to-br from-gray-50 to-gray-100">
+        <div className="aspect-square bg-gray-50">
           <img 
             src={product.photo_url || '/default-product-image.svg'} 
             alt={product.name} 
-            className={`w-full h-full object-cover transition-transform duration-200 ${
-              isHovered ? 'scale-105' : 'scale-100'
-            }`}
+            className="w-full h-full object-cover"
             onError={(e) => {
               const target = e.target as HTMLImageElement;
               target.src = '/default-product-image.svg';
             }}
           />
         </div>
-        
-        {/* Overlay au survol */}
-        <div className={`absolute inset-0 bg-black transition-opacity duration-200 ${
-          isHovered ? 'opacity-15' : 'opacity-0'
-        }`}></div>
 
         {/* Badges de statut */}
-        <div className="absolute top-2 left-2 flex flex-col gap-1">
+        <div className="absolute top-3 left-3 flex flex-col gap-2">
           {!product.vendable && (
-            <span className="bg-orange-500 text-white px-1.5 py-0.5 rounded text-xs font-medium shadow-sm">
-              ⛔
+            <span className="bg-orange-500 text-white px-2 py-1 rounded-lg text-xs font-medium shadow-sm">
+              Non vendable
             </span>
           )}
           {product.stock === 0 && (
-            <span className="bg-red-500 text-white px-1.5 py-0.5 rounded text-xs font-medium shadow-sm">
-              🔴
+            <span className="bg-red-500 text-white px-2 py-1 rounded-lg text-xs font-medium shadow-sm">
+              Rupture
             </span>
           )}
         </div>
 
-        {/* Bouton rapide au survol */}
-        <div className={`absolute inset-0 flex items-center justify-center transition-opacity duration-200 ${
-          isHovered ? 'opacity-100' : 'opacity-0'
-        }`}>
-          <Link 
-            to={`/product/${product.id}`}
-            className="bg-white/90 backdrop-blur-sm text-gray-900 px-3 py-1.5 rounded font-medium shadow-lg hover:bg-white transition-colors text-sm"
-          >
-            Voir détails
-          </Link>
-        </div>
+
       </div>
 
       {/* Contenu */}
-      <div className="p-3 space-y-2">
-
-
-        {/* Champs affichés dans l'ordre configuré */}
-        <div className="space-y-1.5">
-          {renderOrderedFields()}
+      <div className="p-6 space-y-4">
+        {/* Champs affichés */}
+        <div className="space-y-3">
+          {renderFields()}
         </div>
 
         {/* Actions */}
-        <div className="flex items-center justify-between pt-2 border-t border-gray-100">
+        <div className="flex items-center justify-between pt-4 border-t border-gray-100">
           <Link 
             to={`/product/${product.id}`}
-            className="text-xs font-medium transition-colors hover:opacity-80 flex items-center gap-1"
+            className="text-sm font-medium transition-colors hover:opacity-80 flex items-center gap-2"
             style={{ color: theme.primaryColor }}
           >
             <span>Détails</span>
-            <svg className="w-3 h-3 transition-transform group-hover:translate-x-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+            <svg className="w-4 h-4 transition-transform group-hover:translate-x-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
             </svg>
           </Link>
           
-          {showAddToCart && (
+          {onAddToCart && (
             <>
               {product.vendable && product.stock > 0 ? (
                 <button
                   onClick={handleAddToCart}
-                  className="text-white px-3 py-1.5 rounded transition-all duration-200 text-xs font-medium hover:shadow-sm transform hover:scale-105"
+                  className="px-4 py-2 text-white font-medium rounded-lg transition-all hover:opacity-90 shadow-sm flex items-center gap-2"
                   style={{ backgroundColor: theme.primaryColor }}
                 >
-                  <div className="flex items-center gap-1">
-                    <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
-                    </svg>
-                    <span>Ajouter</span>
-                  </div>
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 11V7a4 4 0 00-8 0v4M5 9h14l1 12H4L5 9z" />
+                  </svg>
+                  <span>Ajouter</span>
                 </button>
               ) : !product.vendable ? (
-                <span className="bg-orange-100 text-orange-700 px-2 py-1 rounded text-xs font-medium">
-                  ⛔
+                <span className="bg-orange-50 text-orange-700 px-3 py-2 rounded-lg text-sm font-medium">
+                  Non vendable
                 </span>
               ) : product.stock === 0 ? (
-                <span className="bg-red-100 text-red-700 px-2 py-1 rounded text-xs font-medium">
-                  🔴
+                <span className="bg-red-50 text-red-700 px-3 py-2 rounded-lg text-sm font-medium">
+                  Rupture
                 </span>
               ) : null}
             </>

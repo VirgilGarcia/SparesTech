@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react'
 import { categoryService, type CategoryTree } from '../services/categoryService'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 
 interface MultiCategorySelectorProps {
   value: number[]
@@ -17,7 +17,7 @@ function MultiCategorySelector({
   className = "",
   required = false
 }: MultiCategorySelectorProps) {
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   const [categoryTree, setCategoryTree] = useState<CategoryTree[]>([])
   const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
@@ -119,9 +119,6 @@ function MultiCategorySelector({
             `}
           >
             <span className="flex items-center gap-1">
-              {category.icon && (
-                <span className="text-sm" style={{ color: category.color || theme.primaryColor }}>{category.icon}</span>
-              )}
               <span>{category.name}</span>
             </span>
             {isSelected && (

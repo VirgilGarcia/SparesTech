@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import Header from '../components/Header'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 
 function Register() {
   const [formData, setFormData] = useState({
@@ -17,7 +17,7 @@ function Register() {
   
   const { signUp } = useAuth()
   const navigate = useNavigate()
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setFormData(prev => ({

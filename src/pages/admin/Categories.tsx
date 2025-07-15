@@ -4,12 +4,12 @@ import { categoryService } from '../../services/categoryService'
 import { useAuth } from '../../context/AuthContext'
 import { Navigate } from 'react-router-dom'
 import Header from '../../components/Header'
-import { useTheme } from '../../context/ThemeContext'
+import { useMarketplaceTheme } from '../../context/ThemeContext'
 import type { Category, CategoryTree } from '../../services/categoryService'
 
 function AdminCategories() {
   const { user, loading: authLoading } = useAuth()
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   const [categories, setCategories] = useState<Category[]>([])
   const [categoryTree, setCategoryTree] = useState<CategoryTree[]>([])
   const [loading, setLoading] = useState(true)
@@ -114,13 +114,6 @@ function AdminCategories() {
           `}
         >
           <div className="flex items-center space-x-3">
-            {/* Icône */}
-            {category.icon && (
-              <span className="text-xl" style={{ color: category.color || theme.primaryColor }}>
-                {category.icon}
-              </span>
-            )}
-            
             {/* Informations de la catégorie */}
             <div>
               <h4 className="text-lg font-medium text-gray-900">{category.name}</h4>

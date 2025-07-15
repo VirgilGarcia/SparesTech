@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
-import { useTheme } from '../../context/ThemeContext'
+import { useMarketplaceTheme } from '../../context/ThemeContext'
 import { settingsService } from '../../services/settingsService'
 import type { MarketplaceSettings } from '../../services/settingsService'
 import { supabase } from '../../lib/supabase'
@@ -9,7 +9,7 @@ import Header from '../../components/Header'
 
 function AdminSettings() {
   const { user, loading: authLoading } = useAuth()
-  const { theme } = useTheme()
+  const { theme, refreshSettings } = useMarketplaceTheme()
   const [userRole, setUserRole] = useState<string | null>(null)
   const [roleLoading, setRoleLoading] = useState(false)
   const [settings, setSettings] = useState<MarketplaceSettings | null>(null)
@@ -171,6 +171,9 @@ function AdminSettings() {
       setSettings(updated)
       setLogoFile(null)
       
+      // Forcer le rechargement des paramètres dans le contexte global
+      refreshSettings()
+      
       setSuccess('Tous les paramètres ont été sauvegardés avec succès !')
       setTimeout(() => setSuccess(''), 5000)
       
@@ -258,6 +261,18 @@ function AdminSettings() {
               }`}
             >
               {saving ? '💾 Sauvegarde...' : hasChanges() ? '💾 Sauvegarder' : '✅ Sauvegardé'}
+            </button>
+            
+            <button
+              onClick={() => {
+                refreshSettings()
+                setSuccess('Paramètres rechargés !')
+                setTimeout(() => setSuccess(''), 3000)
+              }}
+              className="px-3 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors text-sm"
+              title="Forcer le rechargement des paramètres"
+            >
+              🔄 Recharger
             </button>
           </div>
         </div>

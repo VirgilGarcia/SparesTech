@@ -15,30 +15,21 @@ export interface OrderItem {
 export interface Order {
   id: number
   user_id: string
-  order_number: string // NOUVEAU CHAMP
-  
-  // Informations client (TOUS les champs de la BDD)
+  order_number: string
+  total_amount: number
   customer_email: string
   customer_company?: string
   customer_phone?: string
   customer_address?: string
   customer_city?: string
   customer_postal_code?: string
-  
-  // Informations commande
-  total_amount: number
-  status: string
   notes?: string
-  
-  // Dates
+  status: string
   created_at: string
   updated_at: string
-  
-  // Relations
   order_items?: OrderItem[]
 }
 
-// Fonction pour générer un numéro de commande unique
 async function generateUniqueOrderNumber(): Promise<string> {
   let orderNumber = ''
   let exists = true
@@ -48,13 +39,10 @@ async function generateUniqueOrderNumber(): Promise<string> {
     const month = String(new Date().getMonth() + 1).padStart(2, '0')
     const day = String(new Date().getDate()).padStart(2, '0')
     
-    // Générer un numéro aléatoire de 4 chiffres
     const randomNum = Math.floor(1000 + Math.random() * 9000)
     
-    // Format: CMD-2025-0711-1234
     orderNumber = `CMD-${year}-${month}${day}-${randomNum}`
     
-    // Vérifier si ce numéro existe déjà
     const { data } = await supabase
       .from('orders')
       .select('id')
@@ -147,7 +135,7 @@ export const orderService = {
       .from('orders')
       .insert([{
         user_id: orderData.user_id,
-        order_number: orderNumber, // NOUVEAU CHAMP
+        order_number: orderNumber,
         total_amount: orderData.total_amount,
         customer_email: orderData.customer_email,
         customer_company: orderData.customer_company,

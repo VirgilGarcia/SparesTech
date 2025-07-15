@@ -1,10 +1,11 @@
-import { createContext, useContext, useEffect } from 'react'
-import { useMarketplaceTheme } from '../hooks/useMarketplaceTheme'
+import { createContext, useContext } from 'react'
+import { useTheme } from '../hooks/useTheme'
 import type { MarketplaceSettings } from '../services/settingsService'
 
 interface MarketplaceContextType {
   settings: MarketplaceSettings | null
   loading: boolean
+  initialized: boolean
   refreshSettings: () => void
   theme: {
     primaryColor: string
@@ -22,25 +23,13 @@ interface MarketplaceContextType {
     isPublic: boolean
     allowRegistration: boolean
   }
+  updateSettings: (updates: Partial<MarketplaceSettings>) => Promise<MarketplaceSettings | undefined>
 }
 
 const MarketplaceContext = createContext<MarketplaceContextType | undefined>(undefined)
 
-interface MarketplaceProviderProps {
-  children: React.ReactNode
-}
-
-export function MarketplaceProvider({ children }: MarketplaceProviderProps) {
-  const themeData = useMarketplaceTheme()
-
-  // Appliquer les couleurs CSS dynamiquement
-  useEffect(() => {
-    if (themeData.settings) {
-      const root = document.documentElement
-      root.style.setProperty('--primary-color', themeData.theme.primaryColor)
-      root.style.setProperty('--secondary-color', themeData.theme.secondaryColor)
-    }
-  }, [themeData.settings])
+export function MarketplaceProvider({ children }: { children: React.ReactNode }) {
+  const themeData = useTheme()
 
   return (
     <MarketplaceContext.Provider value={themeData}>
@@ -49,10 +38,10 @@ export function MarketplaceProvider({ children }: MarketplaceProviderProps) {
   )
 }
 
-export function useTheme() {
+export function useMarketplaceTheme() {
   const context = useContext(MarketplaceContext)
-  if (!context) {
-    throw new Error('useTheme must be used within a MarketplaceProvider')
+  if (context === undefined) {
+    throw new Error('useMarketplaceTheme must be used within a MarketplaceProvider')
   }
   return context
 }

@@ -81,17 +81,13 @@ function AdminDashboard() {
     try {
       setLoading(true)
       
-      // Vérifier et initialiser les catégories si nécessaire
       const hasCategories = await categoryService.hasCategories()
       if (!hasCategories) {
-
         await categoryService.initializeDefaultCategories()
       }
 
-      // Vérifier et initialiser les champs système si nécessaire
       const hasSystemFields = await productStructureService.hasSystemFields()
       if (!hasSystemFields) {
-
         await productStructureService.initializeSystemFields()
       }
       
@@ -99,39 +95,39 @@ function AdminDashboard() {
         productService.getAllProducts(),
         orderService.getAllOrders()
       ])
-      // Dates pour le mois en cours
+      
       const now = new Date()
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
-      // Stats du mois
+      
       const ordersThisMonth = orders.filter(order => {
         const d = new Date(order.created_at)
         return d >= startOfMonth && d < endOfMonth
       })
+      
       setMonthlyStats({
-        productsCount: products.length, // On garde le total produits (pas pertinent de filtrer par mois)
+        productsCount: products.length,
         ordersCount: ordersThisMonth.length,
         totalRevenue: ordersThisMonth.reduce((sum, order) => sum + order.total_amount, 0),
         pendingOrders: ordersThisMonth.filter(order => order.status === 'pending').length
       })
-      // ---- Commandes par jour de la semaine en cours (inchangé) ----
+      
       const weekOrders = [0,0,0,0,0,0,0]
-      const now2 = new Date()
-      const startOfWeek = new Date(now2)
-      startOfWeek.setDate(now2.getDate() - ((now2.getDay() + 6) % 7)) // Lundi
+      const startOfWeek = new Date(now)
+      startOfWeek.setDate(now.getDate() - ((now.getDay() + 6) % 7))
       startOfWeek.setHours(0,0,0,0)
       const endOfWeek = new Date(startOfWeek)
       endOfWeek.setDate(startOfWeek.getDate() + 7)
       endOfWeek.setHours(0,0,0,0)
+      
       orders.forEach(order => {
         const d = new Date(order.created_at)
         if (d >= startOfWeek && d < endOfWeek) {
-          const day = (d.getDay() + 6) % 7 // 0 = lundi, 6 = dimanche
+          const day = (d.getDay() + 6) % 7
           weekOrders[day]++
         }
       })
       setWeeklyOrders(weekOrders)
-      // -------------------------------------------------------------
     } catch (error) {
       console.error('Erreur lors du chargement des stats:', error)
     } finally {

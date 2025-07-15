@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { categoryService, type CategoryTree } from '../services/categoryService'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 
 interface CategoryMenuProps {
   className?: string
@@ -9,7 +9,7 @@ interface CategoryMenuProps {
 }
 
 function CategoryMenu({ className = '', maxLevels = 2 }: CategoryMenuProps) {
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   const [categoryTree, setCategoryTree] = useState<CategoryTree[]>([])
   const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)

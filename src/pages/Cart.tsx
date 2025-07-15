@@ -1,11 +1,11 @@
 import Header from '../components/Header'
 import { Link } from 'react-router-dom' 
 import { useCart } from '../context/CartContext'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 
 function Cart() {
   const { cartItems, removeFromCart, updateQuantity, getTotalPrice } = useCart()
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
 
   if (cartItems.length === 0) {
     return (

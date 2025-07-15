@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 import { supabase } from '../lib/supabase'
 import Header from '../components/Header'
 
@@ -35,7 +35,7 @@ interface Order {
 
 function Orders() {
   const { user } = useAuth()
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   const [orders, setOrders] = useState<Order[]>([])
   const [loading, setLoading] = useState(true)
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null)

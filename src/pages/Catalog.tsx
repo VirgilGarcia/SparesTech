@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { Link, useSearchParams } from 'react-router-dom'
 import Header from '../components/Header'
 import { useCart } from '../context/CartContext'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 import { useAuth } from '../context/AuthContext'
 import { productService } from '../services/productService'
 import { categoryService } from '../services/categoryService'
@@ -10,16 +10,27 @@ import { supabase } from '../lib/supabase'
 import ProductCard from '../components/ProductCard'
 import CategoryNavigation from '../components/CategoryNavigation'
 import CategoryBreadcrumb from '../components/CategoryBreadcrumb'
+import { Pagination } from '../components/Pagination'
+import { useCache } from '../hooks/useCache'
+import { fieldUtils } from '../utils/fieldUtils'
+import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings'
 import type { Product } from '../services/productService'
 import type { CategoryTree } from '../services/categoryService'
 import type { ProductFieldDisplay, ProductFieldValue } from '../services/productService'
-import { productStructureService } from '../services/productStructureService'
 
 function Catalog() {
   const { addToCart } = useCart()
-  const { display, theme } = useTheme()
+  const { display, theme } = useMarketplaceTheme()
   const { user } = useAuth()
+  const { settings } = useMarketplaceSettings()
   const [searchParams, setSearchParams] = useSearchParams()
+  
+  // États de pagination
+  const [currentPage, setCurrentPage] = useState(1)
+  const [itemsPerPage] = useState(10)
+  const [totalItems, setTotalItems] = useState(0)
+  const [totalPages, setTotalPages] = useState(0)
+  
   const [products, setProducts] = useState<Product[]>([])
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
@@ -27,85 +38,148 @@ function Catalog() {
   const [selectedCategoryPath, setSelectedCategoryPath] = useState<string>('')
   const [userRole, setUserRole] = useState<string | null>(null)
   const [showSidebar, setShowSidebar] = useState(true)
-  const [categoryTree, setCategoryTree] = useState<CategoryTree[]>([])
-  const [fieldDisplay, setFieldDisplay] = useState<ProductFieldDisplay[]>([])
   const [fieldValues, setFieldValues] = useState<{ [productId: string]: { [fieldName: string]: string } }>({})
 
-  // Charger l'arbre des catégories au montage
-  useEffect(() => {
-    const loadTree = async () => {
-      const tree = await categoryService.getCategoryTree()
-      setCategoryTree(tree)
-    }
-    loadTree()
-  }, [])
+  // Cache pour les données statiques
+  const { data: categoryTree } = useCache(
+    () => categoryService.getCategoryTree(),
+    [],
+    { ttl: 10 * 60 * 1000 } // 10 minutes
+  )
 
-  // Charger la configuration d'affichage des champs (une seule fois)
-  useEffect(() => {
-    const loadFieldDisplay = async () => {
-      try {
-        const data = await productStructureService.getAllFieldDisplay()
-        setFieldDisplay(data)
-      } catch (error) {
-        console.error('Erreur lors du chargement de la configuration d\'affichage:', error)
-      }
-    }
-    loadFieldDisplay()
-  }, [])
+  const { data: fieldDisplay } = useCache(
+    () => fieldUtils.loadFieldDisplay(),
+    [],
+    { ttl: 5 * 60 * 1000 } // 5 minutes
+  )
+
+  // Déterminer le mode d'affichage des catégories
+  const catalogDisplayMode = settings?.catalog_display_mode || 'subcategories_only'
 
   // Charger tous les produits au démarrage et gérer les paramètres d'URL
   useEffect(() => {
     const categoryParam = searchParams.get('category')
+    const pageParam = searchParams.get('page')
+    const searchParam = searchParams.get('search')
+    
+    let hasChanges = false
+    
     if (categoryParam) {
       const categoryId = parseInt(categoryParam)
-      if (!isNaN(categoryId)) {
+      if (!isNaN(categoryId) && categoryId !== selectedCategoryId) {
         setSelectedCategoryId(categoryId)
-        loadProducts(categoryId)
-        return
+        hasChanges = true
+        // Trouver le chemin de la catégorie
+        if (categoryTree) {
+          const findCategoryPath = (categories: CategoryTree[], targetId: number): string | null => {
+            for (const cat of categories) {
+              if (cat.id === targetId) {
+                return cat.path
+              }
+              if (cat.children.length > 0) {
+                const childPath = findCategoryPath(cat.children, targetId)
+                if (childPath) return childPath
+              }
+            }
+            return null
+          }
+          const path = findCategoryPath(categoryTree, categoryId)
+          if (path) {
+            setSelectedCategoryPath(path)
+          }
+        }
       }
+    } else if (selectedCategoryId !== null) {
+      setSelectedCategoryId(null)
+      setSelectedCategoryPath('')
+      hasChanges = true
     }
-    loadProducts()
+    
+    if (pageParam) {
+      const page = parseInt(pageParam)
+      if (!isNaN(page) && page > 0 && page !== currentPage) {
+        setCurrentPage(page)
+        hasChanges = true
+      }
+    } else if (currentPage !== 1) {
+      setCurrentPage(1)
+      hasChanges = true
+    }
+    
+    if (searchParam !== searchQuery) {
+      setSearchQuery(searchParam || '')
+      hasChanges = true
+    }
   }, [searchParams, categoryTree])
+
+  // Charger les produits quand les paramètres changent
+  useEffect(() => {
+    loadProducts()
+  }, [currentPage, selectedCategoryId, searchQuery])
 
   // Charger le rôle utilisateur
   useEffect(() => {
-    if (user) {
-      loadUserRole()
+    const loadUserRole = async () => {
+      if (!user) {
+        setUserRole(null)
+        return
+      }
+
+      try {
+        const { data: profile } = await supabase
+          .from('user_profiles')
+          .select('role')
+          .eq('id', user.id)
+          .single()
+
+        setUserRole(profile?.role || null)
+      } catch (error) {
+        console.error('Erreur lors du chargement du rôle:', error)
+        setUserRole(null)
+      }
     }
+
+    loadUserRole()
   }, [user])
 
-  const loadUserRole = async () => {
-    if (!user) return
-    
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (!error && data) {
-        setUserRole(data.role)
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement du rôle:', error)
-    }
-  }
-
-  const loadProducts = async (categoryId?: number) => {
+  const loadProducts = async () => {
     try {
       setLoading(true)
-      let data: Product[] = []
-      if (categoryId && categoryTree.length > 0) {
-        const ids = categoryService.getAllDescendantCategoryIds(categoryTree, categoryId)
-        data = await productService.getProductsForCatalog(ids)
+      let categoryIds: number[] | undefined = undefined
+      if (selectedCategoryId && categoryTree) {
+        // Récupérer tous les IDs descendants de la catégorie sélectionnée
+        categoryIds = [selectedCategoryId, ...categoryService.getAllDescendantCategoryIds(categoryTree, selectedCategoryId)]
+        console.log('🔍 Filtrage par catégorie:', {
+          selectedCategoryId,
+          categoryIds,
+          categoryTreeLength: categoryTree.length
+        })
       } else {
-        data = await productService.getProductsForCatalog()
+        console.log('🔍 Pas de catégorie sélectionnée, pas de filtrage')
       }
-      setProducts(data)
-      
-      // Charger les valeurs des champs custom pour tous les produits en une fois
-      await loadAllFieldValues(data)
+      const params = {
+        page: currentPage,
+        limit: itemsPerPage,
+        search: searchQuery || undefined,
+        categoryId: undefined, // on n'utilise plus categoryId seul
+        categoryIds: categoryIds && categoryIds.length > 0 ? categoryIds : undefined,
+        sortBy: 'created_at',
+        sortOrder: 'desc' as const
+      }
+      console.log('📤 Paramètres envoyés au service:', params)
+      const response = await productService.getVisibleProductsPaginated(params)
+      console.log('📥 Réponse du service:', {
+        totalProducts: response.total,
+        productsReturned: response.data.length,
+        currentPage: response.page,
+        totalPages: response.totalPages
+      })
+      setProducts(response.data)
+      setTotalItems(response.total)
+      setTotalPages(response.totalPages)
+      if (response.data.length > 0) {
+        await loadFieldValues(response.data)
+      }
     } catch (error) {
       console.error('Erreur lors du chargement des produits:', error)
     } finally {
@@ -113,12 +187,11 @@ function Catalog() {
     }
   }
 
-  const loadAllFieldValues = async (products: Product[]) => {
+  const loadFieldValues = async (products: Product[]) => {
     try {
       const productIds = products.map(p => p.id)
       if (productIds.length === 0) return
 
-      // Récupérer toutes les valeurs des champs custom pour tous les produits
       const { data, error } = await supabase
         .from('product_field_values')
         .select(`
@@ -135,7 +208,6 @@ function Catalog() {
 
       if (error) throw error
 
-      // Organiser les valeurs par produit
       const values: { [productId: string]: { [fieldName: string]: string } } = {}
       data?.forEach(fv => {
         if (fv.product_fields) {
@@ -155,259 +227,296 @@ function Catalog() {
   // Recherche
   const handleSearch = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!searchQuery.trim()) {
-      loadProducts()
-      return
+    setCurrentPage(1)
+    // Mettre à jour les paramètres d'URL immédiatement
+    const newParams = new URLSearchParams()
+    if (selectedCategoryId) {
+      newParams.set('category', selectedCategoryId.toString())
     }
-    
-    try {
-      setLoading(true)
-      const data = await productService.getVisibleProducts()
-      // Filtrer côté client pour la recherche
-      const filteredData = data.filter(product => 
-        product.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-        product.reference.toLowerCase().includes(searchQuery.toLowerCase())
-      )
-      setProducts(filteredData)
-    } catch (error) {
-      console.error('Erreur lors de la recherche:', error)
-    } finally {
-      setLoading(false)
+    if (searchQuery) {
+      newParams.set('search', searchQuery)
     }
+    setSearchParams(newParams)
   }
 
-  // Filtrer par catégorie
-  const handleCategorySelect = async (categoryId: number, categoryPath: string) => {
+  const handleCategorySelect = (categoryId: number, categoryPath: string) => {
     setSelectedCategoryId(categoryId)
     setSelectedCategoryPath(categoryPath)
-    setSearchParams({ category: categoryId.toString() })
-    await loadProducts(categoryId)
+    setCurrentPage(1)
+    // Mettre à jour les paramètres d'URL immédiatement, et toujours page=1
+    const newParams = new URLSearchParams()
+    newParams.set('category', categoryId.toString())
+    if (searchQuery) {
+      newParams.set('search', searchQuery)
+    }
+    newParams.set('page', '1')
+    setSearchParams(newParams)
   }
 
-  // Réinitialiser les filtres
-  const handleClearFilters = () => {
-    setSelectedCategoryId(null)
-    setSelectedCategoryPath('')
-    setSearchQuery('')
-    setSearchParams({})
-    loadProducts()
+  const handlePageChange = (page: number) => {
+    setCurrentPage(page)
+    // Mettre à jour les paramètres d'URL immédiatement
+    const newParams = new URLSearchParams()
+    if (selectedCategoryId) {
+      newParams.set('category', selectedCategoryId.toString())
+    }
+    if (searchQuery) {
+      newParams.set('search', searchQuery)
+    }
+    if (page > 1) {
+      newParams.set('page', page.toString())
+    }
+    setSearchParams(newParams)
   }
 
-  // Déterminer la catégorie sélectionnée dans l'arbre
-  const selectedCategory = selectedCategoryId
-    ? (function findCategoryById(tree, id) {
-        for (const cat of tree) {
-          if (cat.id === id) return cat
-          if (cat.children && cat.children.length > 0) {
-            const found = findCategoryById(cat.children, id)
+  const filteredProducts = products.filter(product => {
+    if (!product.visible || !product.vendable) return false
+    
+    if (searchQuery) {
+      const query = searchQuery.toLowerCase()
+      return (
+        product.name.toLowerCase().includes(query) ||
+        product.reference.toLowerCase().includes(query)
+      )
+    }
+    
+    return true
+  })
+
+  // Trouver la catégorie sélectionnée et ses sous-catégories
+  const selectedCategory = selectedCategoryId && categoryTree ? 
+    (() => {
+      const findCategory = (categories: CategoryTree[], targetId: number): CategoryTree | null => {
+        for (const cat of categories) {
+          if (cat.id === targetId) return cat
+          if (cat.children.length > 0) {
+            const found = findCategory(cat.children, targetId)
             if (found) return found
           }
         }
         return null
-      })(categoryTree, selectedCategoryId)
-    : null
-  const hasChildren = selectedCategory && selectedCategory.children && selectedCategory.children.length > 0
+      }
+      return findCategory(categoryTree, selectedCategoryId)
+    })() : null
 
-  // Déterminer le mode d'affichage du catalogue
-  const catalogDisplayMode = display.catalogDisplayMode
+  // Déterminer ce qu'il faut afficher
+  const hasProducts = totalItems > 0
+  const hasSubcategories = selectedCategory && selectedCategory.children.length > 0
 
-  // Rendu conditionnel selon le mode
-  const renderCatalogContent = () => {
-    if (catalogDisplayMode === 'subcategories_and_products' && hasChildren) {
-      // Afficher sous-catégories ET articles
-      return (
-        <>
-          <div className="mb-6">
-            <h4 className="text-base font-semibold mb-2">Sous-catégories</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {selectedCategory.children.map(cat => (
-                <div key={cat.id} className="bg-white border rounded-lg p-4 flex flex-col items-center justify-center hover:shadow transition">
-                  <span className="text-2xl mb-2">📁</span>
-                  <span className="font-medium text-gray-800">{cat.name}</span>
-                  <button
-                    className="mt-2 text-xs text-blue-600 hover:underline"
-                    onClick={() => handleCategorySelect(cat.id, cat.path)}
-                  >
-                    Voir
-                  </button>
-                </div>
-              ))}
-            </div>
-          </div>
-          <div>
-            <h4 className="text-base font-semibold mb-2">Articles</h4>
-            <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-              {products.map(product => (
-                <ProductCard 
-                  key={product.id} 
-                  product={product} 
-                  fieldDisplay={fieldDisplay} 
-                  fieldValues={fieldValues[product.id] || {}} 
-                />
-              ))}
-            </div>
-          </div>
-        </>
-      )
+  let showProductsSection = false
+  let showSubcategoriesSection = false
+
+  if (catalogDisplayMode === 'subcategories_only') {
+    if (hasSubcategories) {
+      showSubcategoriesSection = true
+      showProductsSection = false
+    } else {
+      showSubcategoriesSection = false
+      showProductsSection = true
     }
-    if (catalogDisplayMode === 'subcategories_only' && hasChildren) {
-      // Afficher uniquement les sous-catégories si elles existent
-      return (
-        <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-          {selectedCategory.children.map(cat => (
-            <div key={cat.id} className="bg-white border rounded-lg p-4 flex flex-col items-center justify-center hover:shadow transition">
-              <span className="text-2xl mb-2">📁</span>
-              <span className="font-medium text-gray-800">{cat.name}</span>
-              <button
-                className="mt-2 text-xs text-blue-600 hover:underline"
-                onClick={() => handleCategorySelect(cat.id, cat.path)}
-              >
-                Voir
-              </button>
-            </div>
-          ))}
-        </div>
-      )
+  } else if (catalogDisplayMode === 'subcategories_with_products') {
+    if (hasSubcategories) {
+      showSubcategoriesSection = true
     }
-    // Sinon, afficher les articles
-    return (
-      <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
-        {products.map(product => (
-          <ProductCard 
-            key={product.id} 
-            product={product} 
-            fieldDisplay={fieldDisplay} 
-            fieldValues={fieldValues[product.id] || {}} 
-          />
-        ))}
-      </div>
-    )
+    showProductsSection = true
   }
+  
+  // Logique d'affichage :
+  // - Si on a des produits ET qu'on est en mode "sous-catégories avec produits" → afficher produits + sous-catégories
+  // - Si on a des produits ET qu'on est en mode "sous-catégories seulement" → afficher seulement les produits
+  // - Si on n'a pas de produits ET qu'on a des sous-catégories → afficher les sous-catégories
+  // - Si on n'a pas de produits ET qu'on n'a pas de sous-catégories → afficher "aucun produit"
+  
+  // const showProductsSection = hasProducts && (catalogDisplayMode === 'subcategories_with_products' || !hasSubcategories)
+  // const showSubcategoriesSection = hasSubcategories && (catalogDisplayMode === 'subcategories_with_products' || !hasProducts)
 
   return (
     <div className="min-h-screen bg-gray-50">
       <Header />
       
-      <div className="w-full max-w-none px-3 py-4">
-        {/* En-tête du catalogue */}
-        <div className="mb-4 flex items-center justify-between">
-          <div>
-            <h1 className="text-xl font-bold text-gray-900 mb-0.5">Catalogue</h1>
-            <p className="text-xs text-gray-600">{products.length} produit(s) disponible(s)</p>
+      <div className="w-full px-6 lg:px-8 py-8">
+        {/* En-tête avec recherche */}
+        <div className="mb-8">
+          <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center gap-6">
+            <div>
+              <h1 className="text-3xl font-light text-gray-900 mb-2">Catalogue</h1>
+              <p className="text-gray-600">
+                {showProductsSection && showSubcategoriesSection 
+                  ? `${totalItems} produit${totalItems > 1 ? 's' : ''} et ${selectedCategory?.children.length || 0} sous-catégorie${selectedCategory?.children.length !== 1 ? 's' : ''}`
+                  : showProductsSection 
+                    ? `${totalItems} produit${totalItems > 1 ? 's' : ''} trouvé${totalItems > 1 ? 's' : ''}`
+                    : showSubcategoriesSection 
+                      ? `${selectedCategory?.children.length || 0} sous-catégorie${selectedCategory?.children.length !== 1 ? 's' : ''}`
+                      : 'Aucun produit trouvé'
+                }
+              </p>
+            </div>
+            
+            <form onSubmit={handleSearch} className="w-full lg:w-auto">
+              <div className="flex gap-3">
+                <input
+                  type="text"
+                  placeholder="Rechercher un produit..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="flex-1 lg:w-80 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-offset-0 transition-all"
+                  style={{ 
+                    focusRingColor: theme.primaryColor,
+                    focusBorderColor: theme.primaryColor 
+                  }}
+                />
+                <button
+                  type="submit"
+                  className="px-6 py-3 text-white font-medium rounded-lg transition-all hover:opacity-90"
+                  style={{ backgroundColor: theme.primaryColor }}
+                >
+                  Rechercher
+                </button>
+              </div>
+            </form>
           </div>
-          
-          {/* Bouton toggle sidebar */}
-          <button
-            onClick={() => setShowSidebar(!showSidebar)}
-            className="lg:hidden p-1.5 rounded bg-white border border-gray-200 hover:bg-gray-50 transition-colors"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
-            </svg>
-          </button>
         </div>
 
-        {/* Fil d'Ariane */}
-        {(selectedCategoryId || selectedCategoryPath) && (
-          <div className="mb-3">
-            <CategoryBreadcrumb
-              categoryId={selectedCategoryId}
-              categoryPath={selectedCategoryPath}
+        {/* Breadcrumb */}
+        {selectedCategoryPath && (
+          <div className="mb-6">
+            <CategoryBreadcrumb 
+              categoryPath={selectedCategoryPath} 
               onCategorySelect={handleCategorySelect}
             />
           </div>
         )}
 
-        <div className="flex gap-4">
-          {/* Sidebar avec navigation des catégories */}
-          {display.showCategories && (
-            <div className={`
-              ${showSidebar ? 'block' : 'hidden'} 
-              lg:block lg:w-64 flex-shrink-0
-            `}>
-              <div className="bg-white rounded-lg shadow-sm border border-gray-200 p-3 sticky top-20">
-                <CategoryNavigation
-                  onCategorySelect={handleCategorySelect}
-                  showProductCounts={true}
-                />
-                
-                {/* Bouton pour réinitialiser les filtres */}
-                {(selectedCategoryId || searchQuery) && (
-                  <div className="mt-3 pt-3 border-t border-gray-200">
-                    <button
-                      onClick={handleClearFilters}
-                      className="w-full px-3 py-1.5 bg-gray-100 text-gray-700 rounded hover:bg-gray-200 transition-colors text-xs font-medium"
-                    >
-                      Réinitialiser les filtres
-                    </button>
-                  </div>
-                )}
-              </div>
+        <div className="flex flex-col lg:flex-row gap-8">
+          {/* Sidebar avec catégories */}
+          <div className={`lg:w-80 ${showSidebar ? 'block' : 'hidden'}`}>
+            <div className="bg-white rounded-lg border border-gray-100 p-6">
+              <h2 className="text-lg font-medium text-gray-900 mb-4">Catégories</h2>
+              <CategoryNavigation
+                categoryTree={categoryTree || []}
+                selectedCategoryId={selectedCategoryId}
+                onCategorySelect={handleCategorySelect}
+                showProductCounts={catalogDisplayMode === 'subcategories_with_products'}
+                maxLevels={catalogDisplayMode === 'subcategories_only' ? 2 : 10}
+              />
             </div>
-          )}
+          </div>
 
           {/* Contenu principal */}
           <div className="flex-1">
-            {/* Barre de recherche */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-4 mb-4">
-              <form onSubmit={handleSearch} className="flex gap-2">
-                <input 
-                  type="text" 
-                  placeholder="Rechercher une pièce, référence, marque..." 
-                  value={searchQuery}
-                  onChange={(e) => setSearchQuery(e.target.value)}
-                  className="flex-1 px-3 py-2 border border-gray-300 rounded focus:outline-none focus:ring-1 transition-colors text-sm"
-                  style={{ 
-                    borderColor: theme.primaryColor
-                  }}
-                />
-                <button 
-                  type="submit"
-                  className="text-white px-4 py-2 rounded hover:opacity-90 transition-colors font-medium shadow-sm text-sm"
-                  style={{ backgroundColor: theme.primaryColor }}
-                >
-                  Rechercher
-                </button>
-              </form>
+            {/* Bouton toggle sidebar mobile */}
+            <div className="lg:hidden mb-4">
+              <button
+                onClick={() => setShowSidebar(!showSidebar)}
+                className="flex items-center space-x-2 px-4 py-2 text-gray-600 hover:text-gray-900 transition-colors"
+              >
+                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+                </svg>
+                <span>Filtrer par catégorie</span>
+              </button>
             </div>
 
-            {/* Loading */}
-            {loading && (
-              <div className="text-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto mb-3"></div>
-                <p className="text-sm text-gray-600">Chargement des produits...</p>
-              </div>
-            )}
+            {/* Affichage des produits */}
+            {showProductsSection && (
+              <>
+                {loading ? (
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                    {[...Array(8)].map((_, i) => (
+                      <div key={i} className="bg-white rounded-lg border border-gray-100 p-6 animate-pulse">
+                        <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
+                        <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                        <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                      </div>
+                    ))}
+                  </div>
+                ) : filteredProducts.length > 0 ? (
+                  <>
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                      {filteredProducts.map((product) => (
+                        <ProductCard
+                          key={product.id}
+                          product={product}
+                          fieldValues={fieldValues[product.id] || {}}
+                          fieldDisplay={fieldDisplay || {}}
+                          onAddToCart={addToCart}
+                          showPrices={display.showPrices}
+                          showStock={display.showStock}
+                          userRole={userRole}
+                        />
+                      ))}
+                    </div>
 
-            {/* Liste des produits */}
-            {!loading && products.length === 0 && (
-              <div className="text-center py-8">
-                <div className="text-gray-400 mb-3">
-                  <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 7l-8-4-8 4m16 0l-8 4m8-4v10l-8 4m0-10L4 7m8 4v10M4 7v10l8 4" />
-                  </svg>
-                </div>
-                <h3 className="text-base font-medium text-gray-900 mb-2">Aucun produit trouvé</h3>
-                <p className="text-sm text-gray-600 mb-3">
-                  {searchQuery || selectedCategoryId 
-                    ? 'Essayez de modifier vos critères de recherche ou de sélectionner une autre catégorie.'
-                    : 'Aucun produit n\'est disponible pour le moment.'
-                  }
-                </p>
-                {(searchQuery || selectedCategoryId) && (
-                  <button
-                    onClick={handleClearFilters}
-                    className="px-3 py-1.5 bg-emerald-600 text-white rounded hover:bg-emerald-700 transition-colors text-sm"
-                  >
-                    Voir tous les produits
-                  </button>
+                    {/* Pagination - seulement si on affiche des produits */}
+                    {totalPages > 1 && (
+                      <div className="mt-12">
+                        <Pagination
+                          currentPage={currentPage}
+                          totalPages={totalPages}
+                          totalItems={totalItems}
+                          itemsPerPage={itemsPerPage}
+                          onPageChange={handlePageChange}
+                        />
+                      </div>
+                    )}
+                  </>
+                ) : (
+                  <div className="text-center py-12">
+                    <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center"
+                         style={{ backgroundColor: `${theme.primaryColor}10` }}>
+                      <svg className="w-12 h-12" style={{ color: theme.primaryColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                      </svg>
+                    </div>
+                    <h3 className="text-xl font-medium text-gray-900 mb-2">Aucun produit trouvé</h3>
+                    <p className="text-gray-600 mb-6">
+                      Essayez de modifier vos critères de recherche ou parcourez nos catégories.
+                    </p>
+                    <button
+                      onClick={() => {
+                        setSearchQuery('')
+                        setSelectedCategoryId(null)
+                        setSelectedCategoryPath('')
+                        setCurrentPage(1)
+                        setSearchParams(new URLSearchParams())
+                      }}
+                      className="px-6 py-3 text-white font-medium rounded-lg transition-all hover:opacity-90"
+                      style={{ backgroundColor: theme.primaryColor }}
+                    >
+                      Voir tous les produits
+                    </button>
+                  </div>
                 )}
-              </div>
+              </>
             )}
 
-            {/* Grille des produits */}
-            {!loading && products.length > 0 && (
-              renderCatalogContent()
+            {/* Affichage des sous-catégories */}
+            {showSubcategoriesSection && selectedCategory && (
+              <>
+                {/* Séparateur si on affiche aussi des produits */}
+                {showProductsSection && (
+                  <div className="mt-12 mb-8">
+                    <h2 className="text-2xl font-light text-gray-900 mb-6">Sous-catégories</h2>
+                  </div>
+                )}
+                
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                  {selectedCategory.children.map((subCategory) => (
+                    <div
+                      key={subCategory.id}
+                      onClick={() => handleCategorySelect(subCategory.id, subCategory.path)}
+                      className="bg-white rounded-lg border border-gray-100 p-6 cursor-pointer hover:shadow-md transition-all"
+                    >
+                      <div className="text-center">
+                        <h3 className="text-lg font-medium text-gray-900 mb-2">{subCategory.name}</h3>
+                        {catalogDisplayMode === 'subcategories_with_products' && subCategory.product_count !== undefined && (
+                          <p className="text-sm text-gray-600">{subCategory.product_count} produit{subCategory.product_count !== 1 ? 's' : ''}</p>
+                        )}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </>
             )}
           </div>
         </div>

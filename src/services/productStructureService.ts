@@ -266,14 +266,11 @@ export const productStructureService = {
 
   // === INITIALISATION DES CHAMPS SYSTÈME ===
   async initializeSystemFields(): Promise<void> {
-    // Vérifier si les champs système existent déjà
     const hasFields = await this.hasSystemFields()
     if (hasFields) {
-      console.log('Les champs système sont déjà initialisés')
       return
     }
 
-    // D'abord, masquer les champs techniques qui ne doivent jamais être affichés
     await this.hideTechnicalFields()
     const systemFields = [
       {
@@ -323,12 +320,8 @@ export const productStructureService = {
       }
     ]
 
-    // Note: Les champs 'visible' et 'vendable' ne sont pas inclus car ils n'ont pas d'utilité d'affichage
-    // dans le catalogue ou la page produit - ils sont utilisés uniquement pour la logique métier
-
     for (const field of systemFields) {
       try {
-        // Vérifier si le champ existe déjà
         const { data: existing } = await supabase
           .from('product_field_display')
           .select('id')

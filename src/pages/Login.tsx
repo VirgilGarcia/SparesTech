@@ -3,7 +3,7 @@ import { Link, useNavigate, useLocation } from 'react-router-dom'
 import { useAuth } from '../context/AuthContext'
 import { settingsService } from '../services/settingsService'
 import type { MarketplaceSettings } from '../services/settingsService'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 
 function Login() {
   const [email, setEmail] = useState('')
@@ -16,7 +16,7 @@ function Login() {
   const { signIn } = useAuth()
   const navigate = useNavigate()
   const location = useLocation()
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   
   // Récupérer la page de destination (si redirigé depuis PrivateRoute)
   const from = location.state?.from?.pathname || '/'
@@ -71,22 +71,19 @@ function Login() {
   // Afficher le loader pendant le chargement des settings
   if (settingsLoading) {
     return (
-      <div className="min-h-screen bg-stone-50 flex items-center justify-center">
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
-          <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-          <div className="text-stone-600">Chargement...</div>
+          <div className="w-8 h-8 border-2 border-gray-300 border-t-gray-600 rounded-full animate-spin mx-auto mb-4"></div>
+          <div className="text-gray-600">Chargement...</div>
         </div>
       </div>
     )
   }
 
   return (
-    <div 
-      className="min-h-screen flex items-center justify-center py-12 px-4 sm:px-6 lg:px-8"
-      style={{ backgroundColor: settings?.secondary_color || '#f3f4f6' }}
-    >
-      <div className="max-w-md w-full space-y-8">
-        <div className="bg-white p-8 rounded-2xl shadow-sm border border-stone-200">
+    <div className="min-h-screen bg-gray-50 flex items-center justify-center py-12 px-6 lg:px-8">
+      <div className="w-full max-w-md">
+        <div className="bg-white rounded-lg border border-gray-100 p-8">
           {/* Header avec logo et nom de l'entreprise */}
           <div className="text-center mb-8">
             <div className="flex flex-col items-center mb-6">
@@ -95,44 +92,49 @@ function Login() {
                 <img 
                   src={settings.logo_url} 
                   alt={settings.company_name || 'Logo'} 
-                  className="h-16 w-16 object-contain rounded-xl mb-3"
+                  className="h-16 w-16 object-contain rounded-lg mb-4"
                 />
               ) : (
                 <div 
-                  className="h-16 w-16 rounded-xl flex items-center justify-center text-white font-bold text-2xl mb-3"
+                  className="h-16 w-16 rounded-lg flex items-center justify-center text-white font-semibold text-2xl mb-4"
                   style={{ backgroundColor: settings?.primary_color || theme.primaryColor }}
                 >
                   {settings?.company_name ? settings.company_name.charAt(0).toUpperCase() : 'M'}
                 </div>
               )}
               {/* Nom de l'entreprise */}
-              <h1 className="text-2xl font-bold mb-2" style={{ color: settings?.primary_color || theme.primaryColor }}>
+              <h1 className="text-2xl font-light text-gray-900 mb-2">
                 {settings?.company_name || 'Marketplace'}
               </h1>
             </div>
-            <h2 className="text-xl font-semibold text-stone-800">Connexion</h2>
-            <p className="mt-2 text-stone-600">
+            <h2 className="text-xl font-medium text-gray-900">Connexion</h2>
+            <p className="mt-2 text-gray-600">
               Connectez-vous à votre compte
             </p>
             {/* Afficher la raison de la redirection si applicable */}
             {location.state?.from && (
-              <div className="mt-4 p-3 bg-blue-50 border border-blue-200 rounded-lg">
-                <p className="text-sm text-blue-700">
-                  🔒 Connexion requise pour accéder à cette page
+              <div className="mt-4 p-3 rounded-lg border"
+                style={{ 
+                  backgroundColor: `${theme.primaryColor}10`,
+                  borderColor: `${theme.primaryColor}20`
+                }}
+              >
+                <p className="text-sm" style={{ color: theme.primaryColor }}>
+                  Connexion requise pour accéder à cette page
                 </p>
               </div>
             )}
           </div>
 
           {error && (
-            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
               <p className="text-red-700 text-sm">{error}</p>
             </div>
           )}
 
           <form onSubmit={handleSubmit} className="space-y-6">
             <div>
-              <label htmlFor="email" className="block text-sm font-medium text-stone-700 mb-2">
+              <label htmlFor="email" className="block text-sm font-medium text-gray-700 mb-2">
                 Email
               </label>
               <input
@@ -140,11 +142,10 @@ function Login() {
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
-                className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 transition-colors"
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-offset-0 transition-all"
                 style={{
-                  borderColor: theme.primaryColor,
-                  boxShadow: 'none',
-                  outline: 'none'
+                  focusRingColor: theme.primaryColor,
+                  focusBorderColor: theme.primaryColor
                 }}
                 placeholder="votre@email.com"
                 disabled={loading}
@@ -152,7 +153,7 @@ function Login() {
             </div>
 
             <div>
-              <label htmlFor="password" className="block text-sm font-medium text-stone-700 mb-2">
+              <label htmlFor="password" className="block text-sm font-medium text-gray-700 mb-2">
                 Mot de passe
               </label>
               <input
@@ -160,11 +161,10 @@ function Login() {
                 type="password"
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
-                className="w-full px-4 py-3 border border-stone-300 rounded-xl focus:outline-none focus:ring-2 transition-colors"
+                className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-offset-0 transition-all"
                 style={{
-                  borderColor: theme.primaryColor,
-                  boxShadow: 'none',
-                  outline: 'none'
+                  focusRingColor: theme.primaryColor,
+                  focusBorderColor: theme.primaryColor
                 }}
                 placeholder="••••••••"
                 disabled={loading}
@@ -174,7 +174,7 @@ function Login() {
             <button
               type="submit"
               disabled={loading}
-              className={`w-full py-3 px-4 rounded-xl font-medium transition-colors text-white ${
+              className={`w-full py-3 px-4 rounded-lg font-medium transition-all text-white ${
                 loading ? 'opacity-75 cursor-not-allowed' : 'hover:opacity-90'
               }`}
               style={{ backgroundColor: theme.primaryColor }}
@@ -185,13 +185,13 @@ function Login() {
 
           {/* Lien vers l'inscription */}
           {settings?.public_access && (
-            <div className="text-center mt-6">
+            <div className="text-center mt-8">
               <p className="text-sm text-gray-600 mb-2">
                 Pas encore de compte ?
               </p>
               <Link
                 to="/register"
-                className="text-sm font-medium"
+                className="text-sm font-medium transition-colors hover:opacity-80"
                 style={{ color: theme.primaryColor }}
               >
                 Créer un compte
@@ -201,13 +201,13 @@ function Login() {
 
           {/* Lien vers l'accueil si mode privé */}
           {settings && !settings.public_access && (
-            <div className="text-center mt-6">
+            <div className="text-center mt-8">
               <p className="text-sm text-gray-600 mb-2">
                 Ce marketplace est en mode privé
               </p>
               <Link
                 to="/"
-                className="text-sm font-medium"
+                className="text-sm font-medium transition-colors hover:opacity-80"
                 style={{ color: theme.primaryColor }}
               >
                 Retour à l'accueil

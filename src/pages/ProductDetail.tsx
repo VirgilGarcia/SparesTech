@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useParams, Link, useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 import { productService } from '../services/productService'
 import { productStructureService } from '../services/productStructureService'
 import { useAuth } from '../context/AuthContext'
@@ -16,7 +16,7 @@ interface ProductFieldValueWithField extends ProductFieldValue {
 function ProductDetail() {
   const { id } = useParams<{ id: string }>()
   const { addToCart } = useCart()
-  const { display, theme } = useTheme()
+  const { display, theme } = useMarketplaceTheme()
   const { user } = useAuth()
   const navigate = useNavigate()
   
@@ -28,6 +28,7 @@ function ProductDetail() {
   const [fieldDisplay, setFieldDisplay] = useState<ProductFieldDisplay[]>([])
   const [customFieldValues, setCustomFieldValues] = useState<{ [key: string]: string }>({})
   const [customFields, setCustomFields] = useState<ProductField[]>([])
+  const [addingToCart, setAddingToCart] = useState(false)
 
   useEffect(() => {
     if (id) {
@@ -87,11 +88,18 @@ function ProductDetail() {
     }
   }
 
-  const handleAddToCart = () => {
+  const handleAddToCart = async () => {
     if (product && quantity > 0) {
-      // Ajouter la quantité spécifiée
-      for (let i = 0; i < quantity; i++) {
-        addToCart(product)
+      setAddingToCart(true)
+      try {
+        // Ajouter la quantité spécifiée
+        for (let i = 0; i < quantity; i++) {
+          addToCart(product)
+        }
+        // Animation de succès
+        setTimeout(() => setAddingToCart(false), 1000)
+      } catch (error) {
+        setAddingToCart(false)
       }
     }
   }
@@ -121,8 +129,6 @@ function ProductDetail() {
     return field ? field.display_name : fieldName
   }
 
-
-
   // Fonction pour afficher tous les champs dans l'ordre configuré (page produit)
   const renderOrderedFields = () => {
     const allFields = fieldDisplay
@@ -137,7 +143,7 @@ function ProductDetail() {
       // Rendu spécial pour certains champs système
       if (display.field_name === 'name') {
         return (
-          <h1 key={display.id} className="text-2xl font-bold text-gray-900 mb-2">
+          <h1 key={display.id} className="text-4xl font-bold text-gray-900 mb-2 leading-tight">
             {value}
           </h1>
         )
@@ -145,7 +151,7 @@ function ProductDetail() {
 
       if (display.field_name === 'reference') {
         return (
-          <div key={display.id} className="flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-3 py-2 rounded">
+          <div key={display.id} className="inline-flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-full border border-gray-200">
             <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6a2 2 0 012-2h2a2 2 0 012 2v6" />
             </svg>
@@ -156,32 +162,33 @@ function ProductDetail() {
 
       if (display.field_name === 'prix') {
         return (
-          <div key={display.id} className="text-3xl font-bold" style={{ color: theme.primaryColor }}>
-            {value}€
+          <div key={display.id} className="text-5xl font-bold mb-4" style={{ color: theme.primaryColor }}>
+            {parseFloat(value).toFixed(2)}€
           </div>
         )
       }
 
       if (display.field_name === 'stock') {
+        const stockLevel = product && product.stock > 10 ? 'high' : product && product.stock > 0 ? 'medium' : 'low'
+        const stockConfig = {
+          high: { bg: 'bg-green-50', text: 'text-green-800', border: 'border-green-200', dot: 'bg-green-500' },
+          medium: { bg: 'bg-yellow-50', text: 'text-yellow-800', border: 'border-yellow-200', dot: 'bg-yellow-500' },
+          low: { bg: 'bg-red-50', text: 'text-red-800', border: 'border-red-200', dot: 'bg-red-500' }
+        }
+        const config = stockConfig[stockLevel]
+        
         return (
-          <div key={display.id} className={`inline-flex items-center gap-2 px-3 py-1.5 rounded-full text-sm font-medium ${
-            product && product.stock > 10 
-              ? 'bg-green-100 text-green-800 border border-green-200' 
-              : product && product.stock > 0 
-              ? 'bg-yellow-100 text-yellow-800 border border-yellow-200' 
-              : 'bg-red-100 text-red-800 border border-red-200'
-          }`}>
-            <div className={`w-2 h-2 rounded-full ${
-              product && product.stock > 10 ? 'bg-green-500' : product && product.stock > 0 ? 'bg-yellow-500' : 'bg-red-500'
-            }`}></div>
-            <span>{product && product.stock > 0 ? `${value} en stock` : 'Rupture de stock'}</span>
+          <div key={display.id} className={`inline-flex items-center gap-3 px-4 py-3 rounded-xl border ${config.bg} ${config.border}`}>
+            <div className={`w-3 h-3 rounded-full ${config.dot}`}></div>
+            <span className={`text-sm font-semibold ${config.text}`}>
+              {product && product.stock > 0 ? `${value} en stock` : 'Rupture de stock'}
+            </span>
           </div>
         )
       }
 
       // Champs personnalisés avec FieldRenderer
       if (display.field_type === 'custom') {
-        // Trouver les informations du champ personnalisé
         const customField = customFields.find(f => f.name === display.field_name)
         if (!customField) return null
 
@@ -200,11 +207,11 @@ function ProductDetail() {
 
       // Autres champs système (fallback)
       return (
-        <div key={display.id} className="flex items-center justify-between p-3 bg-gray-50 rounded">
+        <div key={display.id} className="flex items-center justify-between p-4 bg-gray-50 rounded-xl border border-gray-200">
           <span className="text-sm font-medium text-gray-700">
             {getFieldDisplayName(display.field_name)}
           </span>
-          <span className="text-sm text-gray-900 font-medium">{value}</span>
+          <span className="text-sm text-gray-900 font-semibold">{value}</span>
         </div>
       )
     })
@@ -224,10 +231,10 @@ function ProductDetail() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="w-full max-w-none px-3 py-4">
-          <div className="text-center py-8">
-            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-emerald-500 mx-auto mb-3"></div>
-            <p className="text-sm text-gray-600">Chargement du produit...</p>
+        <div className="w-full px-6 lg:px-16 xl:px-32 py-20">
+          <div className="text-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-b-2 mx-auto mb-4" style={{ borderColor: theme.primaryColor }}></div>
+            <p className="text-lg text-gray-600">Chargement du produit...</p>
           </div>
         </div>
       </div>
@@ -238,18 +245,25 @@ function ProductDetail() {
     return (
       <div className="min-h-screen bg-gray-50">
         <Header />
-        <div className="w-full max-w-none px-3 py-4">
-          <div className="text-center py-8 bg-white rounded-lg shadow-sm border border-gray-100">
-            <svg className="w-12 h-12 text-gray-400 mx-auto mb-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-            </svg>
-            <p className="text-base font-medium text-gray-900 mb-2">Produit non trouvé</p>
-            <p className="text-sm text-gray-500 mb-4">Le produit que vous recherchez n'existe pas ou n'est plus disponible</p>
+        <div className="w-full px-6 lg:px-16 xl:px-32 py-20">
+          <div className="text-center bg-white rounded-2xl shadow-lg border border-gray-100 p-16">
+            <div className="w-16 h-16 mx-auto mb-6 rounded-full bg-red-100 flex items-center justify-center">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h2 className="text-2xl font-bold text-gray-900 mb-3">Produit non trouvé</h2>
+            <p className="text-gray-600 mb-8 max-w-md mx-auto">
+              Le produit que vous recherchez n'existe pas ou n'est plus disponible
+            </p>
             <Link 
               to="/catalog"
-              className="text-white px-4 py-2 rounded hover:bg-emerald-600 transition-colors font-medium shadow-sm text-sm"
+              className="inline-flex items-center gap-2 px-6 py-3 rounded-xl font-semibold text-white transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
               style={{ backgroundColor: theme.primaryColor }}
             >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
+              </svg>
               Retour au catalogue
             </Link>
           </div>
@@ -263,29 +277,36 @@ function ProductDetail() {
       <Header />
       
       {/* Breadcrumb */}
-      <div className="w-full max-w-screen-2xl mx-auto px-3 py-3">
-        <nav className="flex items-center space-x-2 text-sm text-gray-600 mb-4">
-          <Link to="/catalog" className="hover:text-gray-900 transition-colors">
+      <div className="w-full px-6 lg:px-16 xl:px-32 py-6">
+        <nav className="flex items-center space-x-3 text-sm text-gray-600 mb-8">
+          <Link 
+            to="/catalog" 
+            className="hover:text-gray-900 transition-colors duration-200 flex items-center gap-1"
+          >
+            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+            </svg>
             Catalogue
           </Link>
-          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
           </svg>
-          <span className="text-gray-900 font-medium">{product.name}</span>
+          <span className="text-gray-900 font-semibold truncate">{product.name}</span>
         </nav>
       </div>
 
       {/* Contenu principal */}
-      <div className="w-full max-w-screen-2xl mx-auto px-3 pb-8">
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
+      <div className="w-full px-6 lg:px-16 xl:px-32 pb-20">
+        <div className="grid grid-cols-1 xl:grid-cols-2 gap-16">
+            
           {/* Galerie photos - Fixe lors du scroll */}
-          <div className="lg:sticky lg:top-6 lg:self-start space-y-4">
+          <div className="xl:sticky xl:top-8 xl:self-start space-y-6">
             {/* Image principale */}
-            <div className="aspect-square bg-gradient-to-br from-gray-50 to-gray-100 rounded-xl shadow-lg overflow-hidden group">
+            <div className="h-[calc(100vh-12rem)] bg-gradient-to-br from-gray-50 to-gray-100 rounded-2xl shadow-xl overflow-hidden">
               <img 
                 src={images[selectedImage]} 
                 alt={product.name}
-                className="w-full h-full object-contain transition-transform duration-200 group-hover:scale-105"
+                className="w-full h-full object-contain"
                 onError={(e) => {
                   const target = e.target as HTMLImageElement;
                   target.src = '/default-product-image.svg';
@@ -295,16 +316,19 @@ function ProductDetail() {
 
             {/* Miniatures */}
             {images.length > 1 && (
-              <div className="flex space-x-2 overflow-x-auto">
+              <div className="flex space-x-3 overflow-x-auto pb-2">
                 {images.map((image, index) => (
                   <button
                     key={index}
                     onClick={() => setSelectedImage(index)}
-                    className={`flex-shrink-0 w-16 h-16 rounded-lg overflow-hidden border-2 transition-all duration-200 hover:scale-105 ${
+                    className={`flex-shrink-0 w-20 h-20 rounded-xl overflow-hidden border-2 ${
                       selectedImage === index 
-                        ? 'border-emerald-500 shadow-lg' 
-                        : 'border-gray-200 hover:border-gray-300'
+                        ? 'border-2 shadow-lg' 
+                        : 'border-gray-200'
                     }`}
+                    style={{ 
+                      borderColor: selectedImage === index ? theme.primaryColor : undefined 
+                    }}
                   >
                     <img 
                       src={image} 
@@ -318,40 +342,39 @@ function ProductDetail() {
           </div>
 
           {/* Infos produit */}
-          <div className="space-y-6">
-
+          <div className="space-y-8">
             
             {/* En-tête avec champs dans l'ordre configuré */}
-            <div className="space-y-3">
+            <div className="space-y-4">
               {renderOrderedFields()}
             </div>
 
             {/* Actions */}
-            <div className="space-y-4">
+            <div className="space-y-6">
               {product.vendable && product.stock > 0 ? (
-                <div className="space-y-3">
+                <div className="space-y-4">
                   {/* Sélecteur de quantité */}
-                  <div className="flex items-center space-x-3">
-                    <label className="text-sm font-medium text-gray-700">Quantité:</label>
-                    <div className="flex items-center border border-gray-300 rounded overflow-hidden">
+                  <div className="flex items-center space-x-4">
+                    <label className="text-base font-semibold text-gray-700">Quantité:</label>
+                    <div className="flex items-center border-2 border-gray-200 rounded-xl overflow-hidden shadow-sm">
                       <button
                         onClick={() => handleQuantityChange(quantity - 1)}
                         disabled={quantity <= 1}
-                        className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-4 py-3 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
                         </svg>
                       </button>
-                      <span className="px-4 py-1.5 text-gray-900 font-medium bg-gray-50 border-x border-gray-300">
+                      <span className="px-6 py-3 text-gray-900 font-bold bg-gray-50 border-x border-gray-200 min-w-[60px] text-center">
                         {quantity}
                       </span>
                       <button
                         onClick={() => handleQuantityChange(quantity + 1)}
                         disabled={quantity >= product.stock}
-                        className="px-3 py-1.5 text-gray-600 hover:bg-gray-100 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+                        className="px-4 py-3 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
                       >
-                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                         </svg>
                       </button>
@@ -361,38 +384,48 @@ function ProductDetail() {
                   {/* Bouton ajouter au panier */}
                   <button 
                     onClick={handleAddToCart}
-                    className="w-full py-3 px-4 rounded-lg font-semibold text-white transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-[1.02]"
+                    disabled={addingToCart}
+                    className="w-full py-4 px-6 rounded-xl font-bold text-white transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:opacity-75 disabled:cursor-not-allowed disabled:transform-none"
                     style={{ backgroundColor: theme.primaryColor }}
                   >
-                    <div className="flex items-center justify-center space-x-2">
-                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6m6 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
-                      </svg>
-                      <span className="text-base">Ajouter au panier</span>
+                    <div className="flex items-center justify-center space-x-3">
+                      {addingToCart ? (
+                        <>
+                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
+                          <span className="text-lg">Ajout en cours...</span>
+                        </>
+                      ) : (
+                        <>
+                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6m6 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
+                          </svg>
+                          <span className="text-lg">Ajouter au panier</span>
+                        </>
+                      )}
                     </div>
                   </button>
                 </div>
               ) : (
-                <div className={`rounded-lg p-4 text-center border ${
+                <div className={`rounded-2xl p-6 text-center border-2 ${
                   !product.vendable 
                     ? 'bg-orange-50 border-orange-200' 
                     : 'bg-red-50 border-red-200'
                 }`}>
-                  <div className={`w-8 h-8 mx-auto mb-2 rounded-full flex items-center justify-center ${
+                  <div className={`w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center ${
                     !product.vendable ? 'bg-orange-100' : 'bg-red-100'
                   }`}>
-                    <svg className={`w-4 h-4 ${
+                    <svg className={`w-6 h-6 ${
                       !product.vendable ? 'text-orange-600' : 'text-red-600'
                     }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
                     </svg>
                   </div>
-                  <h3 className={`text-base font-semibold mb-1 ${
+                  <h3 className={`text-lg font-bold mb-2 ${
                     !product.vendable ? 'text-orange-800' : 'text-red-800'
                   }`}>
                     {!product.vendable ? 'Produit non disponible' : 'Rupture de stock'}
                   </h3>
-                  <p className={`text-xs ${
+                  <p className={`text-sm ${
                     !product.vendable ? 'text-orange-700' : 'text-red-700'
                   }`}>
                     {!product.vendable 

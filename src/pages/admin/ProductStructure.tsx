@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { useAuth } from '../../context/AuthContext'
-import { useTheme } from '../../context/ThemeContext'
+import { useMarketplaceTheme } from '../../context/ThemeContext'
 import { Navigate } from 'react-router-dom'
 import Header from '../../components/Header'
 import DraggableFieldList from '../../components/DraggableFieldList'
@@ -9,7 +9,7 @@ import type { ProductField, ProductFieldDisplay } from '../../services/productSe
 
 const ProductStructure: React.FC = () => {
   const { user, loading: authLoading } = useAuth()
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   const [fields, setFields] = useState<ProductField[]>([])
   const [fieldDisplay, setFieldDisplay] = useState<ProductFieldDisplay[]>([])
   const [loading, setLoading] = useState(true)

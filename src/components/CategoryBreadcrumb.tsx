@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { Link } from 'react-router-dom'
 import { categoryService, type Category } from '../services/categoryService'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 
 interface CategoryBreadcrumbProps {
   categoryId?: number | null
@@ -16,7 +16,7 @@ function CategoryBreadcrumb({
   onCategorySelect,
   className = ''
 }: CategoryBreadcrumbProps) {
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   const [breadcrumbPath, setBreadcrumbPath] = useState<Category[]>([])
   const [loading, setLoading] = useState(false)
 
@@ -24,8 +24,7 @@ function CategoryBreadcrumb({
     if (categoryId) {
       loadBreadcrumbPath(categoryId)
     } else if (categoryPath) {
-      // Si on a le path mais pas l'ID, on peut le parser
-      parseCategoryPath()
+      parseCategoryPath(categoryPath)
     } else {
       setBreadcrumbPath([])
     }
@@ -44,10 +43,30 @@ function CategoryBreadcrumb({
     }
   }
 
-  const parseCategoryPath = () => {
-    // Pour l'instant, on ne peut pas parser le path sans les IDs
-    // Cette fonction pourrait être améliorée pour reconstruire le path
-    setBreadcrumbPath([])
+  const parseCategoryPath = async (path: string) => {
+    try {
+      setLoading(true)
+      // Le path est au format "parent > child > grandchild"
+      const categoryNames = path.split(' > ').map(name => name.trim())
+      
+      // Charger toutes les catégories pour trouver les IDs
+      const allCategories = await categoryService.getAllCategories()
+      const breadcrumb: Category[] = []
+      
+      for (const categoryName of categoryNames) {
+        const category = allCategories.find(cat => cat.name === categoryName)
+        if (category) {
+          breadcrumb.push(category)
+        }
+      }
+      
+      setBreadcrumbPath(breadcrumb)
+    } catch (error) {
+      console.error('Erreur lors du parsing du path:', error)
+      setBreadcrumbPath([])
+    } finally {
+      setLoading(false)
+    }
   }
 
   const handleCategoryClick = (category: Category) => {
@@ -59,9 +78,9 @@ function CategoryBreadcrumb({
   if (loading) {
     return (
       <div className={`flex items-center space-x-2 ${className}`}>
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-16"></div>
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-20"></div>
-        <div className="h-4 bg-gray-200 dark:bg-gray-700 rounded animate-pulse w-12"></div>
+        <div className="h-4 bg-gray-200 rounded animate-pulse w-16"></div>
+        <div className="h-4 bg-gray-200 rounded animate-pulse w-20"></div>
+        <div className="h-4 bg-gray-200 rounded animate-pulse w-12"></div>
       </div>
     )
   }
@@ -73,15 +92,19 @@ function CategoryBreadcrumb({
   return (
     <nav className={`flex items-center space-x-2 text-sm ${className}`} aria-label="Fil d'Ariane">
       {/* Accueil */}
-      <Link 
-        to="/catalog"
-        className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200 transition-colors"
+      <button
+        onClick={() => {
+          if (onCategorySelect) {
+            onCategorySelect(0, '') // Reset to root
+          }
+        }}
+        className="flex items-center space-x-1 text-gray-500 hover:text-gray-700 transition-colors"
       >
         <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" />
         </svg>
         <span>Accueil</span>
-      </Link>
+      </button>
 
       {/* Séparateur */}
       <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -96,8 +119,8 @@ function CategoryBreadcrumb({
             className={`
               flex items-center space-x-1 transition-colors hover:opacity-80
               ${index === breadcrumbPath.length - 1 
-                ? 'text-gray-900 dark:text-gray-100 font-medium' 
-                : 'text-gray-600 dark:text-gray-400 hover:text-gray-800 dark:hover:text-gray-200'
+                ? 'text-gray-900 font-medium' 
+                : 'text-gray-600 hover:text-gray-800'
               }
             `}
             style={{

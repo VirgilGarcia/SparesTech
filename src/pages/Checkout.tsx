@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useCart } from '../context/CartContext'
 import { useAuth } from '../context/AuthContext'
-import { useTheme } from '../context/ThemeContext'
+import { useMarketplaceTheme } from '../context/ThemeContext'
 import { orderService } from '../services/orderService'
 import { userProfileService } from '../services/userProfileService'
 import Header from '../components/Header'
@@ -12,7 +12,7 @@ import { ShoppingBag, User, MapPin, FileText, CreditCard, Lock, Truck } from 'lu
 function Checkout() {
   const { cartItems, getTotalPrice, setCartItems } = useCart()
   const { user } = useAuth()
-  const { theme } = useTheme()
+  const { theme } = useMarketplaceTheme()
   const navigate = useNavigate()
   
   const [formData, setFormData] = useState({
