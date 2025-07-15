@@ -6,12 +6,15 @@ import { supabase } from '../../lib/supabase'
 import { settingsService } from '../../services/settingsService'
 import type { MarketplaceSettings } from '../../services/settingsService'
 import Header from '../../components/Header'
+import { ConfirmDialog } from '../../components/ConfirmDialog'
+import { Modal } from '../../components/Modal'
 
 interface User {
   id: string
   email: string
   role: 'admin' | 'client'
   created_at: string
+  is_active: boolean
 }
 
 function AdminUsers() {
@@ -23,14 +26,18 @@ function AdminUsers() {
   const [settings, setSettings] = useState<MarketplaceSettings | null>(null)
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
-  const [showCreateForm, setShowCreateForm] = useState(false)
+  const [showCreateModal, setShowCreateModal] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
+  const [userToArchive, setUserToArchive] = useState<{id: string, email: string, isActive: boolean} | null>(null)
+  const [archiving, setArchiving] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
+  const [showArchived, setShowArchived] = useState(false)
 
   // Form state
   const [newUser, setNewUser] = useState({
     email: '',
-    password: '',
     role: 'client' as 'admin' | 'client'
   })
 
@@ -81,10 +88,10 @@ function AdminUsers() {
     try {
       setLoading(true)
       
-      // Récupérer tous les profils utilisateurs
+      // Récupérer tous les profils utilisateurs (actifs et archivés)
       const { data: profiles, error } = await supabase
         .from('user_profiles')
-        .select('id, role, created_at, email')
+        .select('id, role, created_at, email, is_active')
         .order('created_at', { ascending: false })
 
       if (error) {
@@ -98,6 +105,7 @@ function AdminUsers() {
         email: profile.email || `user-${profile.id.slice(0, 8)}`,
         role: profile.role,
         created_at: profile.created_at,
+        is_active: profile.is_active,
       }))
 
       setUsers(usersFormatted)
@@ -109,24 +117,48 @@ function AdminUsers() {
     }
   }
 
+  // Génération d'un mot de passe temporaire sécurisé
+  const generateTemporaryPassword = (): string => {
+    const charset = 'abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*'
+    let password = ''
+    for (let i = 0; i < 12; i++) {
+      password += charset.charAt(Math.floor(Math.random() * charset.length))
+    }
+    return password
+  }
+
+  const validateForm = () => {
+    const errors: {[key: string]: string} = {}
+    
+    if (!newUser.email) {
+      errors.email = 'L\'email est obligatoire'
+    } else if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(newUser.email)) {
+      errors.email = 'Format d\'email invalide'
+    }
+    
+    setValidationErrors(errors)
+    return Object.keys(errors).length === 0
+  }
+
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (!newUser.email || !newUser.password) {
-      setError('Veuillez remplir tous les champs')
+    if (!validateForm()) {
       return
     }
 
     try {
       setCreating(true)
       setError('')
+      setValidationErrors({})
 
-      // Méthode alternative: Utiliser le trigger automatique
-      // Au lieu de créer manuellement le profil, on va laisser le trigger le faire
-      
+      // Générer un mot de passe temporaire sécurisé
+      const temporaryPassword = generateTemporaryPassword()
+
+      // Créer l'utilisateur avec signUp
       const { data: authData, error: authError } = await supabase.auth.signUp({
         email: newUser.email,
-        password: newUser.password,
+        password: temporaryPassword,
         options: {
           data: {
             email: newUser.email,
@@ -141,8 +173,6 @@ function AdminUsers() {
       if (!authData.user) {
         throw new Error('Aucun utilisateur créé')
       }
-
-      
 
       // Attendre que le trigger crée le profil, puis le mettre à jour avec le bon rôle
       let retries = 0
@@ -160,7 +190,6 @@ function AdminUsers() {
             .eq('id', authData.user.id)
 
           if (!updateError) {
-    
             break
           }
           
@@ -178,7 +207,6 @@ function AdminUsers() {
               })
 
             if (!insertError) {
-      
               break
             }
           }
@@ -199,9 +227,9 @@ function AdminUsers() {
         throw new Error('Timeout: Le profil utilisateur n\'a pas pu être créé')
       }
 
-      setSuccess(`Utilisateur ${newUser.email} créé avec succès ! Un email de confirmation a été envoyé.`)
-      setNewUser({ email: '', password: '', role: 'client' })
-      setShowCreateForm(false)
+      setSuccess(`Utilisateur ${newUser.email} créé avec succès ! Mot de passe temporaire : ${temporaryPassword}`)
+      setNewUser({ email: '', role: 'client' })
+      setShowCreateModal(false)
       
       // Recharger la liste après un délai
       setTimeout(() => {
@@ -211,37 +239,57 @@ function AdminUsers() {
       setTimeout(() => setSuccess(''), 7000)
     } catch (error: any) {
       console.error('❌ Erreur lors de la création:', error)
-      setError(error.message || 'Erreur lors de la création de l\'utilisateur')
+      
+      // Gestion spécifique des erreurs d'email existant
+      if (error.message && error.message.includes('User already registered')) {
+        setValidationErrors({ email: 'Cet email est déjà utilisé' })
+      } else if (error.message && error.message.includes('Invalid email')) {
+        setValidationErrors({ email: 'Format d\'email invalide' })
+      } else if (error.message && error.message.includes('email')) {
+        setValidationErrors({ email: 'Erreur avec l\'email fourni' })
+      } else {
+        setError(error.message || 'Erreur lors de la création de l\'utilisateur')
+      }
     } finally {
       setCreating(false)
     }
   }
 
-  const handleDeleteUser = async (userId: string, email: string) => {
-    if (!confirm(`Êtes-vous sûr de vouloir supprimer l'utilisateur ${email} ?`)) {
+  const handleToggleUserStatus = async (userId: string, email: string, isActive: boolean) => {
+    // Empêcher la modification de son propre compte
+    if (userId === user?.id) {
+      setError('Vous ne pouvez pas modifier votre propre statut')
       return
     }
 
+    setUserToArchive({id: userId, email, isActive})
+  }
+
+  const confirmToggleUserStatus = async () => {
+    if (!userToArchive) return
+
     try {
-      // Empêcher la suppression de son propre compte
-      if (userId === user?.id) {
-        setError('Vous ne pouvez pas supprimer votre propre compte')
-        return
-      }
-
-      const { error: profileError } = await supabase
+      setArchiving(true)
+      
+      const newStatus = !userToArchive.isActive
+      const { error } = await supabase
         .from('user_profiles')
-        .delete()
-        .eq('id', userId)
+        .update({ is_active: newStatus })
+        .eq('id', userToArchive.id)
 
-      if (profileError) throw profileError
+      if (error) throw error
 
-      setSuccess(`Profil utilisateur supprimé.`)
+      const action = newStatus ? 'réactivé' : 'archivé'
+      setSuccess(`Utilisateur ${userToArchive.email} ${action} avec succès.`)
+      
       loadUsers()
       setTimeout(() => setSuccess(''), 5000)
     } catch (error: any) {
-      console.error('Erreur lors de la suppression:', error)
-      setError(error.message || 'Erreur lors de la suppression')
+      console.error('Erreur lors de la modification:', error)
+      setError(error.message || 'Erreur lors de la modification')
+    } finally {
+      setArchiving(false)
+      setUserToArchive(null)
     }
   }
 
@@ -334,104 +382,147 @@ function AdminUsers() {
       <Header />
       <div className="w-full max-w-none px-4 py-6">
         {/* Titre et bouton */}
-        <div className="flex items-center justify-between mb-6">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
           <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Utilisateurs</h1>
-            <p className="text-sm text-gray-600">Gestion des comptes et rôles</p>
+            <h1 className="text-3xl font-bold text-gray-900 mb-2">Utilisateurs</h1>
+            <p className="text-gray-600">Gestion des comptes et rôles</p>
           </div>
-          <button
-            onClick={() => setShowCreateForm(true)}
-            className="flex items-center space-x-2 text-white px-4 py-2 rounded-lg font-medium hover:opacity-90 transition-colors text-sm"
-            style={{ backgroundColor: theme.primaryColor }}
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
-            </svg>
-            <span>Ajouter un utilisateur</span>
-          </button>
+          <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
+            {/* Barre de recherche */}
+            <div className="relative flex-1 lg:w-80">
+              <div className="absolute inset-y-0 left-0 pl-3 flex items-center pointer-events-none">
+                <svg className="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                </svg>
+              </div>
+              <input
+                type="text"
+                placeholder="Rechercher par email..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
+                style={{ 
+                  focusRingColor: theme.primaryColor,
+                  focusBorderColor: theme.primaryColor 
+                }}
+              />
+            </div>
+            
+            {/* Toggle utilisateurs archivés */}
+            <button
+              onClick={() => setShowArchived(!showArchived)}
+              className={`flex items-center gap-2 px-4 py-3 rounded-xl font-medium transition-all duration-200 whitespace-nowrap ${
+                showArchived 
+                  ? 'bg-gray-200 text-gray-700 hover:bg-gray-300' 
+                  : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+              }`}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 8l6 6 6-6" />
+              </svg>
+              <span>{showArchived ? 'Cacher archivés' : 'Voir archivés'}</span>
+            </button>
+            
+            <button
+              onClick={() => setShowCreateModal(true)}
+              className="flex items-center gap-2 text-white px-6 py-3 rounded-xl font-semibold hover:opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 whitespace-nowrap"
+              style={{ backgroundColor: theme.primaryColor }}
+            >
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              <span>Ajouter un utilisateur</span>
+            </button>
+          </div>
         </div>
 
         {/* Messages */}
         {success && (
-          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-lg">
-            <p className="text-green-700 text-sm">✅ {success}</p>
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-green-700 font-medium">{success}</p>
+            </div>
           </div>
         )}
         {error && (
-          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-lg">
-            <p className="text-red-700 text-sm">❌ {error}</p>
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-red-700 font-medium">{error}</p>
+            </div>
           </div>
         )}
 
         {/* Information sur le mode d'accès */}
-        <div className="bg-blue-50 border border-blue-200 rounded-lg p-4 mb-6">
-          <div className="flex items-start">
-            <div className="flex-shrink-0">
-              <svg className="h-5 w-5 text-blue-400" viewBox="0 0 20 20" fill="currentColor">
-                <path fillRule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clipRule="evenodd" />
+        <div className="bg-blue-50 border border-blue-200 rounded-xl p-6 mb-8">
+          <div className="flex items-start gap-4">
+            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+              <svg className="w-5 h-5 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
               </svg>
             </div>
-            <div className="ml-3">
-              <h3 className="text-sm font-medium text-blue-800">
+            <div>
+              <h3 className="text-lg font-semibold text-blue-800 mb-2">
                 {settings?.public_access ? "Mode d'accès : Public" : "Mode d'accès : Privé"}
               </h3>
-              <div className="mt-2 text-sm text-blue-700">
-                <p>
-                  {settings?.public_access 
-                    ? "Les utilisateurs peuvent s'inscrire eux-mêmes. Vous pouvez aussi créer des comptes manuellement avec le bouton ci-dessus."
-                    : "Ce marketplace étant en mode privé, seuls les administrateurs peuvent créer des comptes utilisateurs."
-                  }
-                </p>
-              </div>
+              <p className="text-blue-700 leading-relaxed">
+                {settings?.public_access 
+                  ? "Les utilisateurs peuvent s'inscrire eux-mêmes. Vous pouvez aussi créer des comptes manuellement avec le bouton ci-dessus."
+                  : "Ce marketplace étant en mode privé, seuls les administrateurs peuvent créer des comptes utilisateurs."
+                }
+              </p>
             </div>
           </div>
         </div>
 
-        {/* Formulaire de création de compte - toujours disponible pour les admins */}
-        {showCreateForm && (
-          <div className="mb-8 bg-white rounded-lg border border-gray-100 p-6 shadow-sm">
-            <div className="flex items-center justify-between mb-6">
-              <h2 className="text-lg font-bold text-gray-900">Créer un nouvel utilisateur</h2>
-              <button
-                onClick={() => {
-                  setShowCreateForm(false)
-                  setNewUser({ email: '', password: '', role: 'client' })
-                  setError('')
-                }}
-                className="text-gray-400 hover:text-gray-600"
-              >
-                <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
-                </svg>
-              </button>
-            </div>
-            <form onSubmit={handleCreateUser} className="space-y-4">
-              <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={newUser.email}
-                    onChange={(e) => setNewUser(prev => ({ ...prev, email: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                    required
-                  />
-                </div>
-                <div>
-                  <label className="block text-sm font-medium text-gray-700 mb-2">
-                    Mot de passe temporaire
-                  </label>
-                  <input
-                    type="password"
-                    value={newUser.password}
-                    onChange={(e) => setNewUser(prev => ({ ...prev, password: e.target.value }))}
-                    className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                    minLength={6}
-                    required
-                  />
-                </div>
+        {/* Modal de création d'utilisateur */}
+        <Modal
+          isOpen={showCreateModal}
+          onClose={() => {
+            setShowCreateModal(false)
+            setNewUser({ email: '', role: 'client' })
+            setError('')
+            setValidationErrors({})
+          }}
+          title="Créer un nouvel utilisateur"
+          size="lg"
+        >
+          <form onSubmit={handleCreateUser} className="space-y-4">
+            <div className="grid grid-cols-1 gap-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Email
+                </label>
+                <input
+                  type="email"
+                  value={newUser.email}
+                  onChange={(e) => {
+                    setNewUser(prev => ({ ...prev, email: e.target.value }))
+                    if (validationErrors.email) {
+                      setValidationErrors(prev => ({ ...prev, email: '' }))
+                    }
+                  }}
+                  className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
+                    validationErrors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
+                  }`}
+                  style={!validationErrors.email ? { 
+                    focusRingColor: theme.primaryColor,
+                    focusBorderColor: theme.primaryColor 
+                  } : {}}
+                  required
+                />
+                {validationErrors.email && (
+                  <p className="text-red-600 text-sm mt-1">{validationErrors.email}</p>
+                )}
               </div>
               <div>
                 <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -440,53 +531,101 @@ function AdminUsers() {
                 <select
                   value={newUser.role}
                   onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value as 'admin' | 'client' }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
+                  style={{ 
+                    focusRingColor: theme.primaryColor,
+                    focusBorderColor: theme.primaryColor 
+                  }}
                 >
                   <option value="client">Client</option>
                   <option value="admin">Administrateur</option>
                 </select>
               </div>
-              <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-3">
-                <p className="text-yellow-800 text-xs">
-                  ℹ️ L'utilisateur recevra un email de confirmation à l'adresse indiquée.
+            </div>
+            
+            {/* Message d'erreur général */}
+            {error && (
+              <div className="bg-red-50 border border-red-200 rounded-xl p-4">
+                <div className="flex items-center gap-3">
+                  <div className="w-6 h-6 rounded-full bg-red-100 flex items-center justify-center">
+                    <svg className="w-4 h-4 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                  </div>
+                  <p className="text-red-800 text-sm">{error}</p>
+                </div>
+              </div>
+            )}
+            
+            <div className="bg-blue-50 border border-blue-200 rounded-xl p-4">
+              <div className="flex items-center gap-3">
+                <div className="w-6 h-6 rounded-full bg-blue-100 flex items-center justify-center">
+                  <svg className="w-4 h-4 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                  </svg>
+                </div>
+                <p className="text-blue-800 text-sm">
+                  Un mot de passe temporaire sécurisé sera généré automatiquement et affiché après la création.
                 </p>
               </div>
-              <div className="flex justify-end space-x-3">
-                <button
-                  type="button"
-                  onClick={() => setShowCreateForm(false)}
-                  className="px-4 py-2 text-gray-600 border border-gray-300 rounded-lg hover:bg-gray-50 text-sm"
-                >
-                  Annuler
-                </button>
-                <button
-                  type="submit"
-                  disabled={creating}
-                  className="px-4 py-2 text-white rounded-lg font-medium hover:opacity-90 transition-colors text-sm"
-                  style={{ backgroundColor: theme.primaryColor }}
-                >
-                  {creating ? 'Création...' : 'Créer l\'utilisateur'}
-                </button>
-              </div>
-            </form>
-          </div>
-        )}
+            </div>
+            
+            <div className="flex justify-end gap-3 pt-4">
+              <button
+                type="button"
+                onClick={() => setShowCreateModal(false)}
+                className="px-6 py-3 text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50 font-medium transition-colors"
+              >
+                Annuler
+              </button>
+              <button
+                type="submit"
+                disabled={creating}
+                className="px-6 py-3 text-white rounded-xl font-semibold hover:opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105 disabled:opacity-50 disabled:cursor-not-allowed disabled:transform-none"
+                style={{ backgroundColor: theme.primaryColor }}
+              >
+                {creating ? 'Création...' : 'Créer l\'utilisateur'}
+              </button>
+            </div>
+          </form>
+        </Modal>
 
         {/* Liste des utilisateurs */}
-        <div className="bg-white rounded-lg border border-gray-100 shadow-sm overflow-hidden">
-          <div className="px-6 py-4 border-b border-gray-100">
-            <h2 className="text-lg font-bold text-gray-900">
-              Utilisateurs ({users.length})
-            </h2>
+        <div className="bg-white rounded-2xl border border-gray-100 shadow-lg overflow-hidden">
+          <div className="px-6 py-5 border-b border-gray-100">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full flex items-center justify-center"
+                   style={{ backgroundColor: `${theme.primaryColor}20` }}>
+                <svg className="w-5 h-5" style={{ color: theme.primaryColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <h2 className="text-xl font-bold text-gray-900">
+                Utilisateurs ({users.filter(userItem => 
+                  userItem.email.toLowerCase().includes(searchQuery.toLowerCase()) &&
+                  (showArchived || userItem.is_active)
+                ).length}{searchQuery && ` sur ${users.length}`})
+              </h2>
+            </div>
           </div>
           {loading ? (
-            <div className="p-8 text-center">
-              <div className="w-8 h-8 border-3 border-emerald-500 border-t-transparent rounded-full animate-spin mx-auto mb-4"></div>
-              <p className="text-gray-600">Chargement des utilisateurs...</p>
+            <div className="p-12 text-center">
+              <div className="w-12 h-12 border-4 rounded-full animate-spin mx-auto mb-4"
+                   style={{ 
+                     borderColor: `${theme.primaryColor}20`,
+                     borderTopColor: theme.primaryColor 
+                   }}>
+              </div>
+              <p className="text-gray-600 font-medium">Chargement des utilisateurs...</p>
             </div>
           ) : users.length === 0 ? (
-            <div className="p-8 text-center">
-              <p className="text-gray-600">Aucun utilisateur trouvé</p>
+            <div className="p-12 text-center">
+              <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                <svg className="w-8 h-8 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z" />
+                </svg>
+              </div>
+              <p className="text-gray-600 font-medium">Aucun utilisateur trouvé</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -500,27 +639,44 @@ function AdminUsers() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-100">
-                  {users.map((userItem) => (
+                  {users.filter(userItem => 
+                    userItem.email.toLowerCase().includes(searchQuery.toLowerCase()) &&
+                    (showArchived || userItem.is_active)
+                  ).map((userItem) => (
                     <tr key={userItem.id} className="hover:bg-gray-50">
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-4">
                         <div className="flex items-center">
-                          <div className="w-8 h-8 bg-gray-200 rounded-full flex items-center justify-center mr-3">
-                            <span className="text-sm font-medium text-gray-700">
+                          <div className="w-10 h-10 rounded-full flex items-center justify-center mr-4"
+                               style={{ backgroundColor: `${theme.primaryColor}20` }}>
+                            <span className="text-sm font-semibold" style={{ color: theme.primaryColor }}>
                               {userItem.email.charAt(0).toUpperCase()}
                             </span>
                           </div>
                           <div>
-                            <p className="text-sm font-medium text-gray-900">{userItem.email}</p>
+                            <div className="flex items-center gap-2">
+                              <p className={`text-sm font-semibold ${userItem.is_active ? 'text-gray-900' : 'text-gray-500'}`}>
+                                {userItem.email}
+                              </p>
+                              {!userItem.is_active && (
+                                <span className="px-2 py-1 text-xs font-medium bg-red-100 text-red-700 rounded-full">
+                                  Archivé
+                                </span>
+                              )}
+                            </div>
                             {userItem.id === user?.id && (
-                              <p className="text-xs text-blue-600">C'est vous</p>
+                              <p className="text-xs font-medium" style={{ color: theme.primaryColor }}>C'est vous</p>
                             )}
                           </div>
                         </div>
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-4">
                         {userItem.id === user?.id ? (
                           // Affichage en lecture seule pour son propre compte
-                          <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                          <span className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium"
+                                style={{ 
+                                  backgroundColor: `${theme.primaryColor}20`,
+                                  color: theme.primaryColor 
+                                }}>
                             {userItem.role === 'admin' ? 'Admin' : 'Client'}
                           </span>
                         ) : (
@@ -528,23 +684,31 @@ function AdminUsers() {
                           <select
                             value={userItem.role}
                             onChange={(e) => handleRoleChange(userItem.id, e.target.value as 'admin' | 'client')}
-                            className="text-sm border border-gray-300 rounded px-2 py-1 focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500"
+                            className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
+                            style={{ 
+                              focusRingColor: theme.primaryColor,
+                              focusBorderColor: theme.primaryColor 
+                            }}
                           >
                             <option value="client">Client</option>
                             <option value="admin">Admin</option>
                           </select>
                         )}
                       </td>
-                      <td className="px-4 py-3 text-sm text-gray-600">
+                      <td className="px-6 py-4 text-sm text-gray-600 font-medium">
                         {formatDate(userItem.created_at)}
                       </td>
-                      <td className="px-4 py-3">
+                      <td className="px-6 py-4">
                         {userItem.id !== user?.id ? (
                           <button
-                            onClick={() => handleDeleteUser(userItem.id, userItem.email)}
-                            className="text-red-600 hover:text-red-800 text-sm font-medium"
+                            onClick={() => handleToggleUserStatus(userItem.id, userItem.email, userItem.is_active)}
+                            className={`px-3 py-1 text-sm font-medium rounded-lg transition-all ${
+                              userItem.is_active 
+                                ? 'text-orange-600 hover:text-orange-800 hover:bg-orange-50' 
+                                : 'text-green-600 hover:text-green-800 hover:bg-green-50'
+                            }`}
                           >
-                            Supprimer
+                            {userItem.is_active ? 'Archiver' : 'Réactiver'}
                           </button>
                         ) : (
                           <span className="text-sm text-gray-400">-</span>
@@ -557,6 +721,22 @@ function AdminUsers() {
             </div>
           )}
         </div>
+
+        {/* Modal de confirmation d'archivage/désarchivage */}
+        <ConfirmDialog
+          isOpen={userToArchive !== null}
+          onCancel={() => setUserToArchive(null)}
+          onConfirm={confirmToggleUserStatus}
+          title={userToArchive?.isActive ? "Archiver l'utilisateur" : "Réactiver l'utilisateur"}
+          message={userToArchive?.isActive 
+            ? `Êtes-vous sûr de vouloir archiver l'utilisateur "${userToArchive?.email}" ? Il ne pourra plus se connecter.`
+            : `Êtes-vous sûr de vouloir réactiver l'utilisateur "${userToArchive?.email}" ? Il pourra de nouveau se connecter.`
+          }
+          confirmText={userToArchive?.isActive ? "Archiver" : "Réactiver"}
+          cancelText="Annuler"
+          type={userToArchive?.isActive ? "warning" : "info"}
+          loading={archiving}
+        />
       </div>
     </div>
   )

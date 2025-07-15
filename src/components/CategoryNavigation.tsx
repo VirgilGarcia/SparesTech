@@ -41,10 +41,12 @@ function CategoryNavigation({
   }
 
   const renderCategory = (category: CategoryTree, level: number = 0): JSX.Element => {
-    const isExpanded = expandedCategories.has(category.id)
-    const hasChildren = category.children.length > 0
     const isSelected = selectedCategoryId === category.id
-    const canExpand = hasChildren && level < maxLevels
+    
+    // Afficher seulement les catégories de niveau 0 (racines)
+    if (level > 0) {
+      return <></>
+    }
 
     return (
       <div key={category.id}>
@@ -56,21 +58,8 @@ function CategoryNavigation({
               : 'hover:bg-gray-100'
             }
           `}
-          style={{ paddingLeft: `${level * 1.5 + 0.75}rem` }}
           onClick={() => handleCategoryClick(category)}
         >
-          {canExpand && (
-            <button
-              className="p-1 rounded hover:bg-gray-200 transition-colors"
-              onClick={(e) => toggleCategory(category.id, e)}
-              type="button"
-            >
-              <ChevronRightIcon
-                className={`w-4 h-4 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-              />
-            </button>
-          )}
-          
           <span className="flex-1">{category.name}</span>
           
           {showProductCounts && category.product_count !== undefined && (
@@ -79,12 +68,6 @@ function CategoryNavigation({
             </span>
           )}
         </div>
-        
-        {canExpand && isExpanded && (
-          <div className="mt-1">
-            {category.children.map(child => renderCategory(child, level + 1))}
-          </div>
-        )}
       </div>
     )
   }

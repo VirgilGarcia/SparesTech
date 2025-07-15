@@ -101,8 +101,7 @@ export function useTheme() {
   const defaultDisplay = {
     showPrices: true,
     showStock: true,
-    showCategories: true,
-    catalogDisplayMode: 'subcategories_only'
+    showCategories: true
   }
 
   const defaultAccess = {
@@ -121,8 +120,7 @@ export function useTheme() {
   const display = {
     showPrices: state.settings?.show_prices ?? defaultDisplay.showPrices,
     showStock: state.settings?.show_stock ?? defaultDisplay.showStock,
-    showCategories: state.settings?.show_categories ?? defaultDisplay.showCategories,
-    catalogDisplayMode: state.settings?.catalog_display_mode || defaultDisplay.catalogDisplayMode
+    showCategories: state.settings?.show_categories ?? defaultDisplay.showCategories
   }
 
   const access = {

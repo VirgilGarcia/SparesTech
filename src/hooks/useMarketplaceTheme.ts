@@ -62,8 +62,7 @@ export function useMarketplaceTheme() {
     display: {
       showPrices: settings?.show_prices ?? true,
       showStock: settings?.show_stock ?? true,
-      showCategories: settings?.show_categories ?? true,
-      catalogDisplayMode: settings?.catalog_display_mode || 'subcategories_only'
+      showCategories: settings?.show_categories ?? true
     },
     access: {
       isPublic: settings?.public_access ?? true,

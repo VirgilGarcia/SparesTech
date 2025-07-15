@@ -21,7 +21,6 @@ function AdminSettings() {
   // États du formulaire
   const [formData, setFormData] = useState({
     public_access: true,
-    catalog_display_mode: 'subcategories_only',
     company_name: '',
     primary_color: '#10b981',
     secondary_color: '#f3f4f6'
@@ -48,7 +47,6 @@ function AdminSettings() {
     if (settings) {
       setFormData({
         public_access: settings.public_access,
-        catalog_display_mode: settings.catalog_display_mode || 'subcategories_only',
         company_name: settings.company_name || '',
         primary_color: settings.primary_color,
         secondary_color: settings.secondary_color
@@ -191,7 +189,6 @@ function AdminSettings() {
     return (
       logoFile !== null ||
       formData.public_access !== settings.public_access ||
-      formData.catalog_display_mode !== settings.catalog_display_mode ||
       formData.company_name !== (settings.company_name || '') ||
       formData.primary_color !== settings.primary_color ||
       formData.secondary_color !== settings.secondary_color
@@ -441,24 +438,6 @@ function AdminSettings() {
                 </div>
               </div>
 
-              {/* Mode d'affichage du catalogue */}
-              <div>
-                <label htmlFor="catalog_display_mode" className="block text-sm font-semibold text-gray-900 mb-2">
-                  Mode d'affichage du catalogue
-                </label>
-                <select
-                  id="catalog_display_mode"
-                  value={formData.catalog_display_mode || 'subcategories_only'}
-                  onChange={e => setFormData(prev => ({ ...prev, catalog_display_mode: e.target.value }))}
-                  className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-1 focus:ring-blue-500 text-sm"
-                >
-                  <option value="subcategories_only">Afficher uniquement les sous-catégories si elles existent</option>
-                  <option value="subcategories_and_products">Afficher sous-catégories et articles</option>
-                </select>
-                <p className="text-xs text-gray-500 mt-1">
-                  Contrôle l'affichage du catalogue selon la structure de tes catégories.
-                </p>
-              </div>
             </div>
           </div>
 

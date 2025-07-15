@@ -53,8 +53,8 @@ function Catalog() {
     { ttl: 5 * 60 * 1000 } // 5 minutes
   )
 
-  // Déterminer le mode d'affichage des catégories
-  const catalogDisplayMode = settings?.catalog_display_mode || 'subcategories_only'
+  // Mode d'affichage fixe : toujours afficher sous-catégories ET produits
+  const catalogDisplayMode = 'subcategories_with_products'
 
   // Charger tous les produits au démarrage et gérer les paramètres d'URL
   useEffect(() => {
@@ -147,9 +147,9 @@ function Catalog() {
       setLoading(true)
       let categoryIds: number[] | undefined = undefined
       if (selectedCategoryId && categoryTree) {
-        // Récupérer tous les IDs descendants de la catégorie sélectionnée
-        categoryIds = [selectedCategoryId, ...categoryService.getAllDescendantCategoryIds(categoryTree, selectedCategoryId)]
-        console.log('🔍 Filtrage par catégorie:', {
+        // Récupérer SEULEMENT les produits directement tagués dans cette catégorie (pas les sous-catégories)
+        categoryIds = [selectedCategoryId]
+        console.log('🔍 Filtrage par catégorie (directe seulement):', {
           selectedCategoryId,
           categoryIds,
           categoryTreeLength: categoryTree.length
@@ -240,6 +240,19 @@ function Catalog() {
   }
 
   const handleCategorySelect = (categoryId: number, categoryPath: string) => {
+    // Cas spécial : retour à l'accueil (categoryId = -1)
+    if (categoryId === -1) {
+      setSelectedCategoryId(null)
+      setSelectedCategoryPath('')
+      setCurrentPage(1)
+      const newParams = new URLSearchParams()
+      if (searchQuery) {
+        newParams.set('search', searchQuery)
+      }
+      setSearchParams(newParams)
+      return
+    }
+    
     setSelectedCategoryId(categoryId)
     setSelectedCategoryPath(categoryPath)
     setCurrentPage(1)
@@ -299,36 +312,13 @@ function Catalog() {
       return findCategory(categoryTree, selectedCategoryId)
     })() : null
 
-  // Déterminer ce qu'il faut afficher
+  // Déterminer ce qu'il faut afficher - logique simplifiée
   const hasProducts = totalItems > 0
   const hasSubcategories = selectedCategory && selectedCategory.children.length > 0
-
-  let showProductsSection = false
-  let showSubcategoriesSection = false
-
-  if (catalogDisplayMode === 'subcategories_only') {
-    if (hasSubcategories) {
-      showSubcategoriesSection = true
-      showProductsSection = false
-    } else {
-      showSubcategoriesSection = false
-      showProductsSection = true
-    }
-  } else if (catalogDisplayMode === 'subcategories_with_products') {
-    if (hasSubcategories) {
-      showSubcategoriesSection = true
-    }
-    showProductsSection = true
-  }
   
-  // Logique d'affichage :
-  // - Si on a des produits ET qu'on est en mode "sous-catégories avec produits" → afficher produits + sous-catégories
-  // - Si on a des produits ET qu'on est en mode "sous-catégories seulement" → afficher seulement les produits
-  // - Si on n'a pas de produits ET qu'on a des sous-catégories → afficher les sous-catégories
-  // - Si on n'a pas de produits ET qu'on n'a pas de sous-catégories → afficher "aucun produit"
-  
-  // const showProductsSection = hasProducts && (catalogDisplayMode === 'subcategories_with_products' || !hasSubcategories)
-  // const showSubcategoriesSection = hasSubcategories && (catalogDisplayMode === 'subcategories_with_products' || !hasProducts)
+  // Toujours afficher les sous-catégories ET les produits
+  const showProductsSection = true
+  const showSubcategoriesSection = hasSubcategories
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -378,10 +368,10 @@ function Catalog() {
         </div>
 
         {/* Breadcrumb */}
-        {selectedCategoryPath && (
+        {selectedCategoryId && (
           <div className="mb-6">
             <CategoryBreadcrumb 
-              categoryPath={selectedCategoryPath} 
+              categoryId={selectedCategoryId}
               onCategorySelect={handleCategorySelect}
             />
           </div>
@@ -396,8 +386,8 @@ function Catalog() {
                 categoryTree={categoryTree || []}
                 selectedCategoryId={selectedCategoryId}
                 onCategorySelect={handleCategorySelect}
-                showProductCounts={catalogDisplayMode === 'subcategories_with_products'}
-                maxLevels={catalogDisplayMode === 'subcategories_only' ? 2 : 10}
+                showProductCounts={false}
+                maxLevels={1}
               />
             </div>
           </div>
@@ -417,106 +407,112 @@ function Catalog() {
               </button>
             </div>
 
-            {/* Affichage des produits */}
-            {showProductsSection && (
+            {/* Affichage des sous-catégories EN PREMIER */}
+            {showSubcategoriesSection && selectedCategory && (
               <>
-                {loading ? (
-                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                    {[...Array(8)].map((_, i) => (
-                      <div key={i} className="bg-white rounded-lg border border-gray-100 p-6 animate-pulse">
-                        <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
-                        <div className="h-4 bg-gray-200 rounded mb-2"></div>
-                        <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                <div className="mb-8">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                    {selectedCategory.children.map((subCategory) => (
+                      <div
+                        key={subCategory.id}
+                        onClick={() => handleCategorySelect(subCategory.id, subCategory.path)}
+                        className="group bg-white rounded-2xl border border-gray-100 p-8 cursor-pointer hover:shadow-xl hover:border-gray-200 transition-all duration-300 transform hover:scale-105"
+                      >
+                        <div className="text-center">
+                          <div className="w-16 h-16 mx-auto mb-4 rounded-full flex items-center justify-center transition-all duration-300 group-hover:scale-110"
+                               style={{ backgroundColor: `${theme.primaryColor}15` }}>
+                            <svg className="w-8 h-8 transition-all duration-300" style={{ color: theme.primaryColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                            </svg>
+                          </div>
+                          <h3 className="text-xl font-semibold text-gray-900 mb-2 group-hover:text-gray-700 transition-colors duration-300">{subCategory.name}</h3>
+                          <div className="flex items-center justify-center text-sm text-gray-500 group-hover:text-gray-600 transition-colors duration-300">
+                            <span>Explorer</span>
+                            <svg className="w-4 h-4 ml-1 transform group-hover:translate-x-1 transition-transform duration-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                            </svg>
+                          </div>
+                        </div>
                       </div>
                     ))}
                   </div>
-                ) : filteredProducts.length > 0 ? (
-                  <>
-                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
-                      {filteredProducts.map((product) => (
-                        <ProductCard
-                          key={product.id}
-                          product={product}
-                          fieldValues={fieldValues[product.id] || {}}
-                          fieldDisplay={fieldDisplay || {}}
-                          onAddToCart={addToCart}
-                          showPrices={display.showPrices}
-                          showStock={display.showStock}
-                          userRole={userRole}
-                        />
-                      ))}
-                    </div>
+                </div>
+              </>
+            )}
 
-                    {/* Pagination - seulement si on affiche des produits */}
-                    {totalPages > 1 && (
-                      <div className="mt-12">
-                        <Pagination
-                          currentPage={currentPage}
-                          totalPages={totalPages}
-                          totalItems={totalItems}
-                          itemsPerPage={itemsPerPage}
-                          onPageChange={handlePageChange}
-                        />
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <div className="text-center py-12">
-                    <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center"
-                         style={{ backgroundColor: `${theme.primaryColor}10` }}>
-                      <svg className="w-12 h-12" style={{ color: theme.primaryColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-                      </svg>
-                    </div>
-                    <h3 className="text-xl font-medium text-gray-900 mb-2">Aucun produit trouvé</h3>
-                    <p className="text-gray-600 mb-6">
-                      Essayez de modifier vos critères de recherche ou parcourez nos catégories.
-                    </p>
-                    <button
-                      onClick={() => {
-                        setSearchQuery('')
-                        setSelectedCategoryId(null)
-                        setSelectedCategoryPath('')
-                        setCurrentPage(1)
-                        setSearchParams(new URLSearchParams())
-                      }}
-                      className="px-6 py-3 text-white font-medium rounded-lg transition-all hover:opacity-90"
-                      style={{ backgroundColor: theme.primaryColor }}
-                    >
-                      Voir tous les produits
-                    </button>
+            {/* Affichage des produits APRÈS les sous-catégories */}
+            {filteredProducts.length > 0 && (
+              <>
+                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                  {filteredProducts.map((product) => (
+                    <ProductCard
+                      key={product.id}
+                      product={product}
+                      fieldValues={fieldValues[product.id] || {}}
+                      fieldDisplay={fieldDisplay || {}}
+                      onAddToCart={addToCart}
+                      showPrices={display.showPrices}
+                      showStock={display.showStock}
+                      userRole={userRole}
+                    />
+                  ))}
+                </div>
+
+                {/* Pagination - seulement si on affiche des produits */}
+                {totalPages > 1 && (
+                  <div className="mt-12">
+                    <Pagination
+                      currentPage={currentPage}
+                      totalPages={totalPages}
+                      totalItems={totalItems}
+                      itemsPerPage={itemsPerPage}
+                      onPageChange={handlePageChange}
+                    />
                   </div>
                 )}
               </>
             )}
-
-            {/* Affichage des sous-catégories */}
-            {showSubcategoriesSection && selectedCategory && (
-              <>
-                {/* Séparateur si on affiche aussi des produits */}
-                {showProductsSection && (
-                  <div className="mt-12 mb-8">
-                    <h2 className="text-2xl font-light text-gray-900 mb-6">Sous-catégories</h2>
-                  </div>
-                )}
-                
-                <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                  {selectedCategory.children.map((subCategory) => (
-                    <div
-                      key={subCategory.id}
-                      onClick={() => handleCategorySelect(subCategory.id, subCategory.path)}
-                      className="bg-white rounded-lg border border-gray-100 p-6 cursor-pointer hover:shadow-md transition-all"
-                    >
-                      <div className="text-center">
-                        <h3 className="text-lg font-medium text-gray-900 mb-2">{subCategory.name}</h3>
-                        {catalogDisplayMode === 'subcategories_with_products' && subCategory.product_count !== undefined && (
-                          <p className="text-sm text-gray-600">{subCategory.product_count} produit{subCategory.product_count !== 1 ? 's' : ''}</p>
-                        )}
-                      </div>
-                    </div>
-                  ))}
+            
+            {/* Message "Aucun produit trouvé" seulement s'il n'y a ni produits ni sous-catégories */}
+            {!loading && filteredProducts.length === 0 && !showSubcategoriesSection && (
+              <div className="text-center py-12">
+                <div className="w-24 h-24 mx-auto mb-6 rounded-full flex items-center justify-center"
+                     style={{ backgroundColor: `${theme.primaryColor}10` }}>
+                  <svg className="w-12 h-12" style={{ color: theme.primaryColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
+                  </svg>
                 </div>
-              </>
+                <h3 className="text-xl font-medium text-gray-900 mb-2">Aucun produit trouvé</h3>
+                <p className="text-gray-600 mb-6">
+                  Essayez de modifier vos critères de recherche ou parcourez nos catégories.
+                </p>
+                <button
+                  onClick={() => {
+                    setSearchQuery('')
+                    setSelectedCategoryId(null)
+                    setSelectedCategoryPath('')
+                    setCurrentPage(1)
+                    setSearchParams(new URLSearchParams())
+                  }}
+                  className="px-6 py-3 text-white font-medium rounded-lg transition-all hover:opacity-90"
+                  style={{ backgroundColor: theme.primaryColor }}
+                >
+                  Voir tous les produits
+                </button>
+              </div>
+            )}
+            
+            {/* Loading state */}
+            {loading && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 2xl:grid-cols-5 gap-6">
+                {[...Array(8)].map((_, i) => (
+                  <div key={i} className="bg-white rounded-lg border border-gray-100 p-6 animate-pulse">
+                    <div className="w-full h-48 bg-gray-200 rounded-lg mb-4"></div>
+                    <div className="h-4 bg-gray-200 rounded mb-2"></div>
+                    <div className="h-3 bg-gray-200 rounded w-2/3"></div>
+                  </div>
+                ))}
+              </div>
             )}
           </div>
         </div>

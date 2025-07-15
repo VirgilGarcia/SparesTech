@@ -7,6 +7,7 @@ import { productStructureService } from '../services/productStructureService'
 import { useAuth } from '../context/AuthContext'
 import Header from '../components/Header'
 import FieldRenderer from '../components/FieldRenderer'
+import CategoryBreadcrumb from '../components/CategoryBreadcrumb'
 import type { Product, ProductFieldDisplay, ProductFieldValue, ProductField } from '../services/productService'
 
 interface ProductFieldValueWithField extends ProductFieldValue {
@@ -44,11 +45,14 @@ function ProductDetail() {
       setLoading(true)
       const data = await productService.getProductById(id!)
       if (data) {
+        console.log('📦 Données produit chargées:', data)
+        console.log('🏷️ Categories du produit:', data.product_categories)
         setProduct(data)
       } else {
         setError('Produit non trouvé')
       }
     } catch (err: any) {
+      console.error('❌ Erreur lors du chargement du produit:', err)
       setError('Erreur lors du chargement du produit')
     } finally {
       setLoading(false)
@@ -129,6 +133,17 @@ function ProductDetail() {
     return field ? field.display_name : fieldName
   }
 
+  // Fonction helper pour obtenir la catégorie principale d'un produit
+  const getMainCategoryId = (product: Product): number | null => {
+    if (!product.product_categories || product.product_categories.length === 0) {
+      console.log('🔍 Pas de catégories trouvées pour le produit:', product.name)
+      return null
+    }
+    const categoryId = product.product_categories[0].category_id
+    console.log('🔍 Catégorie principale trouvée:', categoryId, 'pour le produit:', product.name)
+    return categoryId
+  }
+
   // Fonction pour afficher tous les champs dans l'ordre configuré (page produit)
   const renderOrderedFields = () => {
     const allFields = fieldDisplay
@@ -143,7 +158,7 @@ function ProductDetail() {
       // Rendu spécial pour certains champs système
       if (display.field_name === 'name') {
         return (
-          <h1 key={display.id} className="text-4xl font-bold text-gray-900 mb-2 leading-tight">
+          <h1 key={display.id} className="text-2xl font-bold text-gray-900 leading-tight">
             {value}
           </h1>
         )
@@ -151,18 +166,18 @@ function ProductDetail() {
 
       if (display.field_name === 'reference') {
         return (
-          <div key={display.id} className="inline-flex items-center gap-2 text-sm text-gray-600 bg-gray-50 px-4 py-2 rounded-full border border-gray-200">
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 17v-6a2 2 0 012-2h2a2 2 0 012 2v6" />
+          <div key={display.id} className="flex items-center gap-2 text-xs text-gray-600 bg-gray-50 px-3 py-1 rounded-full w-fit">
+            <svg className="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A1.994 1.994 0 013 12V7a4 4 0 014-4z" />
             </svg>
-            <span className="font-mono font-medium">Ref: {value}</span>
+            <span className="font-mono font-medium">{value}</span>
           </div>
         )
       }
 
       if (display.field_name === 'prix') {
         return (
-          <div key={display.id} className="text-5xl font-bold mb-4" style={{ color: theme.primaryColor }}>
+          <div key={display.id} className="text-3xl font-bold" style={{ color: theme.primaryColor }}>
             {parseFloat(value).toFixed(2)}€
           </div>
         )
@@ -178,9 +193,9 @@ function ProductDetail() {
         const config = stockConfig[stockLevel]
         
         return (
-          <div key={display.id} className={`inline-flex items-center gap-3 px-4 py-3 rounded-xl border ${config.bg} ${config.border}`}>
-            <div className={`w-3 h-3 rounded-full ${config.dot}`}></div>
-            <span className={`text-sm font-semibold ${config.text}`}>
+          <div key={display.id} className={`flex items-center gap-2 px-3 py-2 rounded-lg border w-fit ${config.bg} ${config.border}`}>
+            <div className={`w-2 h-2 rounded-full ${config.dot}`}></div>
+            <span className={`text-xs font-semibold ${config.text}`}>
               {product && product.stock > 0 ? `${value} en stock` : 'Rupture de stock'}
             </span>
           </div>
@@ -279,19 +294,42 @@ function ProductDetail() {
       {/* Breadcrumb */}
       <div className="w-full px-6 lg:px-16 xl:px-32 py-6">
         <nav className="flex items-center space-x-3 text-sm text-gray-600 mb-8">
-          <Link 
-            to="/catalog" 
-            className="hover:text-gray-900 transition-colors duration-200 flex items-center gap-1"
-          >
-            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
-            </svg>
-            Catalogue
-          </Link>
-          <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
-          </svg>
-          <span className="text-gray-900 font-semibold truncate">{product.name}</span>
+          {/* Breadcrumb des catégories */}
+          {getMainCategoryId(product) ? (
+            <div className="flex items-center space-x-3">
+              <CategoryBreadcrumb 
+                categoryId={getMainCategoryId(product)}
+                onCategorySelect={(categoryId) => {
+                  if (categoryId === -1) {
+                    navigate('/catalog')
+                  } else {
+                    navigate(`/catalog?category=${categoryId}`)
+                  }
+                }}
+              />
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-gray-900 font-semibold truncate">{product.name}</span>
+            </div>
+          ) : (
+            // Fallback si pas de catégorie
+            <div className="flex items-center space-x-3">
+              <Link 
+                to="/catalog" 
+                className="hover:text-gray-900 transition-colors duration-200 flex items-center gap-1"
+              >
+                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2H5a2 2 0 00-2-2z" />
+                </svg>
+                Catalogue
+              </Link>
+              <svg className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+              </svg>
+              <span className="text-gray-900 font-semibold truncate">{product.name}</span>
+            </div>
+          )}
         </nav>
       </div>
 
@@ -342,99 +380,106 @@ function ProductDetail() {
           </div>
 
           {/* Infos produit */}
-          <div className="space-y-8">
-            
-            {/* En-tête avec champs dans l'ordre configuré */}
-            <div className="space-y-4">
-              {renderOrderedFields()}
-            </div>
+          <div className="max-w-xl">
+            {/* Card principale avec infos essentielles */}
+            <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+              
+              {/* Header avec titre et référence */}
+              <div className="p-6 border-b border-gray-100">
+                <div className="space-y-3">
+                  {renderOrderedFields()}
+                </div>
+              </div>
 
-            {/* Actions */}
-            <div className="space-y-6">
-              {product.vendable && product.stock > 0 ? (
-                <div className="space-y-4">
-                  {/* Sélecteur de quantité */}
-                  <div className="flex items-center space-x-4">
-                    <label className="text-base font-semibold text-gray-700">Quantité:</label>
-                    <div className="flex items-center border-2 border-gray-200 rounded-xl overflow-hidden shadow-sm">
-                      <button
-                        onClick={() => handleQuantityChange(quantity - 1)}
-                        disabled={quantity <= 1}
-                        className="px-4 py-3 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
+              {/* Actions d'achat */}
+              <div className="p-6">
+                {product.vendable && product.stock > 0 ? (
+                  <div className="space-y-4">
+                    {/* Quantité et bouton sur la même ligne */}
+                    <div className="flex items-center gap-4">
+                      <div className="flex items-center gap-2">
+                        <span className="text-sm font-medium text-gray-700">Qté:</span>
+                        <div className="flex items-center border border-gray-300 rounded-lg overflow-hidden">
+                          <button
+                            onClick={() => handleQuantityChange(quantity - 1)}
+                            disabled={quantity <= 1}
+                            className="px-3 py-2 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
+                            </svg>
+                          </button>
+                          <span className="px-4 py-2 text-gray-900 font-semibold bg-gray-50 border-x border-gray-300 min-w-[50px] text-center">
+                            {quantity}
+                          </span>
+                          <button
+                            onClick={() => handleQuantityChange(quantity + 1)}
+                            disabled={quantity >= product.stock}
+                            className="px-3 py-2 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed"
+                          >
+                            <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                            </svg>
+                          </button>
+                        </div>
+                      </div>
+                      
+                      {/* Bouton ajouter au panier */}
+                      <button 
+                        onClick={handleAddToCart}
+                        disabled={addingToCart}
+                        className="flex-1 py-3 px-4 rounded-lg font-semibold text-white transition-all duration-200 shadow-md hover:shadow-lg transform hover:scale-[1.02] disabled:opacity-75 disabled:cursor-not-allowed disabled:transform-none"
+                        style={{ backgroundColor: theme.primaryColor }}
                       >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M20 12H4" />
-                        </svg>
-                      </button>
-                      <span className="px-6 py-3 text-gray-900 font-bold bg-gray-50 border-x border-gray-200 min-w-[60px] text-center">
-                        {quantity}
-                      </span>
-                      <button
-                        onClick={() => handleQuantityChange(quantity + 1)}
-                        disabled={quantity >= product.stock}
-                        className="px-4 py-3 text-gray-600 hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors duration-200"
-                      >
-                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
-                        </svg>
+                        <div className="flex items-center justify-center gap-2">
+                          {addingToCart ? (
+                            <>
+                              <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
+                              <span className="text-sm">Ajout...</span>
+                            </>
+                          ) : (
+                            <>
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-1.5 3M7 13l1.5 3m0 0h9m-9-3a2 2 0 110 4 2 2 0 010-4zm9 0a2 2 0 110 4 2 2 0 010-4z" />
+                              </svg>
+                              <span>Ajouter au panier</span>
+                            </>
+                          )}
+                        </div>
                       </button>
                     </div>
                   </div>
-
-                  {/* Bouton ajouter au panier */}
-                  <button 
-                    onClick={handleAddToCart}
-                    disabled={addingToCart}
-                    className="w-full py-4 px-6 rounded-xl font-bold text-white transition-all duration-300 shadow-lg hover:shadow-xl transform hover:scale-[1.02] disabled:opacity-75 disabled:cursor-not-allowed disabled:transform-none"
-                    style={{ backgroundColor: theme.primaryColor }}
-                  >
-                    <div className="flex items-center justify-center space-x-3">
-                      {addingToCart ? (
-                        <>
-                          <div className="animate-spin rounded-full h-5 w-5 border-b-2 border-white"></div>
-                          <span className="text-lg">Ajout en cours...</span>
-                        </>
-                      ) : (
-                        <>
-                          <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 3h2l.4 2M7 13h10l4-8H5.4m0 0L7 13m0 0l-2.5 5M7 13l2.5 5m6-5v6a2 2 0 01-2 2H9a2 2 0 01-2-2v-6m6 0V9a2 2 0 00-2-2H9a2 2 0 00-2 2v4.01" />
-                          </svg>
-                          <span className="text-lg">Ajouter au panier</span>
-                        </>
-                      )}
+                ) : (
+                  <div className={`rounded-lg p-4 text-center border ${
+                    !product.vendable 
+                      ? 'bg-orange-50 border-orange-200' 
+                      : 'bg-red-50 border-red-200'
+                  }`}>
+                    <div className={`w-8 h-8 mx-auto mb-3 rounded-full flex items-center justify-center ${
+                      !product.vendable ? 'bg-orange-100' : 'bg-red-100'
+                    }`}>
+                      <svg className={`w-5 h-5 ${
+                        !product.vendable ? 'text-orange-600' : 'text-red-600'
+                      }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
+                      </svg>
                     </div>
-                  </button>
-                </div>
-              ) : (
-                <div className={`rounded-2xl p-6 text-center border-2 ${
-                  !product.vendable 
-                    ? 'bg-orange-50 border-orange-200' 
-                    : 'bg-red-50 border-red-200'
-                }`}>
-                  <div className={`w-12 h-12 mx-auto mb-4 rounded-full flex items-center justify-center ${
-                    !product.vendable ? 'bg-orange-100' : 'bg-red-100'
-                  }`}>
-                    <svg className={`w-6 h-6 ${
-                      !product.vendable ? 'text-orange-600' : 'text-red-600'
-                    }`} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
-                    </svg>
+                    <h3 className={`text-sm font-semibold mb-1 ${
+                      !product.vendable ? 'text-orange-800' : 'text-red-800'
+                    }`}>
+                      {!product.vendable ? 'Non disponible' : 'Rupture de stock'}
+                    </h3>
+                    <p className={`text-xs ${
+                      !product.vendable ? 'text-orange-700' : 'text-red-700'
+                    }`}>
+                      {!product.vendable 
+                        ? 'Produit non disponible à la vente'
+                        : 'Temporairement en rupture de stock'
+                      }
+                    </p>
                   </div>
-                  <h3 className={`text-lg font-bold mb-2 ${
-                    !product.vendable ? 'text-orange-800' : 'text-red-800'
-                  }`}>
-                    {!product.vendable ? 'Produit non disponible' : 'Rupture de stock'}
-                  </h3>
-                  <p className={`text-sm ${
-                    !product.vendable ? 'text-orange-700' : 'text-red-700'
-                  }`}>
-                    {!product.vendable 
-                      ? 'Ce produit n\'est pas disponible à la vente'
-                      : 'Ce produit est temporairement en rupture de stock'
-                    }
-                  </p>
-                </div>
-              )}
+                )}
+              </div>
             </div>
           </div>
         </div>
