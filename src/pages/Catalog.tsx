@@ -27,7 +27,7 @@ function Catalog() {
   
   // États de pagination
   const [currentPage, setCurrentPage] = useState(1)
-  const [itemsPerPage] = useState(10)
+  const [itemsPerPage] = useState(20)
   const [totalItems, setTotalItems] = useState(0)
   const [totalPages, setTotalPages] = useState(0)
   
@@ -163,8 +163,8 @@ function Catalog() {
         search: searchQuery || undefined,
         categoryId: undefined, // on n'utilise plus categoryId seul
         categoryIds: categoryIds && categoryIds.length > 0 ? categoryIds : undefined,
-        sortBy: 'created_at',
-        sortOrder: 'desc' as const
+        sortBy: 'name',
+        sortOrder: 'asc' as const
       }
       console.log('📤 Paramètres envoyés au service:', params)
       const response = await productService.getVisibleProductsPaginated(params)
@@ -283,7 +283,7 @@ function Catalog() {
   }
 
   const filteredProducts = products.filter(product => {
-    if (!product.visible || !product.vendable) return false
+    if (!product.visible) return false
     
     if (searchQuery) {
       const query = searchQuery.toLowerCase()

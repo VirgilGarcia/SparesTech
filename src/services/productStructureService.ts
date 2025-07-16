@@ -46,15 +46,20 @@ export const productStructureService = {
     
     if (error) throw error
 
-    // Ajouter automatiquement l'entrée d'affichage
+    // Calculer les prochains ordres disponibles
+    const allDisplayFields = await this.getAllFieldDisplay()
+    const maxCatalogOrder = Math.max(...allDisplayFields.map(f => f.catalog_order || 0), 0)
+    const maxProductOrder = Math.max(...allDisplayFields.map(f => f.product_order || 0), 0)
+
+    // Ajouter automatiquement l'entrée d'affichage avec les bons ordres
     await this.addFieldDisplay({
       field_name: field.name,
       field_type: 'custom',
       display_name: field.label,
       show_in_catalog: true,
       show_in_product: true,
-      catalog_order: 999,
-      product_order: 999
+      catalog_order: maxCatalogOrder + 1,
+      product_order: maxProductOrder + 1
     })
 
     return data
@@ -199,6 +204,8 @@ export const productStructureService = {
   },
 
   async reorderFields(updates: { id: string, catalog_order?: number, product_order?: number }[]): Promise<void> {
+    console.log('🔄 reorderFields appelé avec:', updates)
+    
     // Mettre à jour chaque champ individuellement pour éviter les problèmes avec upsert
     for (const update of updates) {
       const updateData: Partial<ProductFieldDisplay> = {}
@@ -212,17 +219,26 @@ export const productStructureService = {
       }
       
       if (Object.keys(updateData).length > 0) {
-        const { error } = await supabase
+        console.log(`📝 Mise à jour du champ ${update.id} avec:`, updateData)
+        
+        const { error, data } = await supabase
           .from('product_field_display')
           .update(updateData)
           .eq('id', update.id)
+          .select('*')
         
         if (error) {
-          console.error('Erreur lors de la mise à jour du champ:', update.id, error)
+          console.error('❌ Erreur lors de la mise à jour du champ:', update.id, error)
           throw error
         }
+        
+        console.log('✅ Champ mis à jour avec succès:', data)
+      } else {
+        console.log('⚠️ Aucune donnée valide à mettre à jour pour:', update)
       }
     }
+    
+    console.log('🎉 reorderFields terminé avec succès')
   },
 
   async getFieldDisplayById(id: string): Promise<ProductFieldDisplay | null> {
@@ -389,6 +405,68 @@ export const productStructureService = {
     } catch (error) {
       console.error('Erreur lors de la vérification des champs système:', error)
       return false
+    }
+  },
+
+  // === MIGRATION POUR CORRIGER LES ORDRES ===
+  async fixOrderValues(): Promise<void> {
+    try {
+      const allFields = await this.getAllFieldDisplay()
+      
+      // Vérifier s'il y a des champs avec des ordres en conflit (même valeur)
+      const catalogOrders = allFields.map(f => f.catalog_order || 0)
+      const productOrders = allFields.map(f => f.product_order || 0)
+      const hasCatalogConflicts = catalogOrders.length !== new Set(catalogOrders).size
+      const hasProductConflicts = productOrders.length !== new Set(productOrders).size
+      
+      // Ne faire la migration que s'il y a des conflits
+      if (!hasCatalogConflicts && !hasProductConflicts) {
+        console.log('Aucune migration nécessaire - les ordres sont déjà uniques')
+        return
+      }
+      
+      console.log('Migration nécessaire - correction des ordres en conflit')
+      
+      // Séparer les champs système et personnalisés
+      const systemFields = allFields.filter(f => f.field_type === 'system')
+      const customFields = allFields.filter(f => f.field_type === 'custom')
+      
+      // Réassigner les ordres pour le catalogue seulement si nécessaire
+      if (hasCatalogConflicts) {
+        let catalogOrder = 1
+        for (const field of systemFields.sort((a, b) => (a.catalog_order || 999) - (b.catalog_order || 999))) {
+          if (field.catalog_order !== catalogOrder) {
+            await this.updateFieldDisplay(field.id, { catalog_order: catalogOrder })
+          }
+          catalogOrder++
+        }
+        
+        for (const field of customFields.sort((a, b) => (a.created_at || '') > (b.created_at || '') ? 1 : -1)) {
+          await this.updateFieldDisplay(field.id, { catalog_order: catalogOrder })
+          catalogOrder++
+        }
+      }
+      
+      // Réassigner les ordres pour la page produit seulement si nécessaire
+      if (hasProductConflicts) {
+        let productOrder = 1
+        for (const field of systemFields.sort((a, b) => (a.product_order || 999) - (b.product_order || 999))) {
+          if (field.product_order !== productOrder) {
+            await this.updateFieldDisplay(field.id, { product_order: productOrder })
+          }
+          productOrder++
+        }
+        
+        for (const field of customFields.sort((a, b) => (a.created_at || '') > (b.created_at || '') ? 1 : -1)) {
+          await this.updateFieldDisplay(field.id, { product_order: productOrder })
+          productOrder++
+        }
+      }
+      
+      console.log('Migration des ordres terminée avec succès')
+    } catch (error) {
+      console.error('Erreur lors de la migration des ordres:', error)
+      throw error
     }
   },
 

@@ -3,7 +3,7 @@ import { categoryService, type CategoryTree } from '../services/categoryService'
 import { useMarketplaceTheme } from '../context/ThemeContext'
 
 interface MultiCategorySelectorProps {
-  value: number[]
+  value?: number[]
   onChange: (categoryIds: number[]) => void
   placeholder?: string
   className?: string
@@ -69,14 +69,16 @@ function MultiCategorySelector({
   }
 
   const handleCategorySelect = (category: CategoryTree) => {
-    const newValue = value.includes(category.id)
-      ? value.filter(id => id !== category.id)
-      : [...value, category.id]
+    const currentValue = value || []
+    const newValue = currentValue.includes(category.id)
+      ? currentValue.filter(id => id !== category.id)
+      : [...currentValue, category.id]
     onChange(newValue)
   }
 
   const handleRemoveCategory = (categoryId: number) => {
-    const newValue = value.filter(id => id !== categoryId)
+    const currentValue = value || []
+    const newValue = currentValue.filter(id => id !== categoryId)
     onChange(newValue)
   }
 
@@ -93,7 +95,7 @@ function MultiCategorySelector({
   }
 
   const renderCategoryOption = (category: CategoryTree, level: number = 0): JSX.Element => {
-    const isSelected = value.includes(category.id)
+    const isSelected = value?.includes(category.id) || false
     const isExpanded = expanded.has(category.id)
     const hasChildren = category.children.length > 0
     return (

@@ -67,6 +67,12 @@ export interface PaginationParams {
   categoryIds?: number[] // Nouveau paramètre pour filtrer par plusieurs catégories
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
+  // Nouveaux filtres pour optimisation serveur
+  stockLevel?: 'in_stock' | 'low_stock' | 'out_of_stock'
+  visible?: boolean
+  vendable?: boolean
+  priceMin?: number
+  priceMax?: number
 }
 
 export interface PaginatedResponse<T> {
@@ -80,24 +86,100 @@ export interface PaginatedResponse<T> {
 }
 
 export const productService = {
-  // Méthode pour les admins - retourne TOUS les produits avec pagination
+  // Méthode pour les admins - retourne TOUS les produits avec pagination optimisée
   async getAllProductsPaginated(params: PaginationParams): Promise<PaginatedResponse<Product>> {
-    const { page, limit, search, categoryId, categoryIds, sortBy = 'created_at', sortOrder = 'desc' } = params
+    const { 
+      page, 
+      limit, 
+      search, 
+      categoryId, 
+      categoryIds, 
+      sortBy = 'name', 
+      sortOrder = 'asc',
+      stockLevel,
+      visible,
+      vendable,
+      priceMin,
+      priceMax
+    } = params
     const offset = (page - 1) * limit
+
+    // Si on filtre par catégorie, on doit d'abord obtenir les product_ids
+    let productIds: string[] | undefined
+    if (categoryIds && categoryIds.length > 0) {
+      const { data: productCategoryData, error: pcError } = await supabase
+        .from('product_categories')
+        .select('product_id')
+        .in('category_id', categoryIds)
+      
+      if (pcError) throw pcError
+      productIds = productCategoryData?.map(pc => pc.product_id) || []
+    } else if (categoryId) {
+      const { data: productCategoryData, error: pcError } = await supabase
+        .from('product_categories')
+        .select('product_id')
+        .eq('category_id', categoryId)
+      
+      if (pcError) throw pcError
+      productIds = productCategoryData?.map(pc => pc.product_id) || []
+    }
 
     let query = supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))', { count: 'exact' })
 
-    // Filtres
+    // Filtres de recherche
     if (search) {
       query = query.or(`name.ilike.%${search}%,reference.ilike.%${search}%`)
     }
 
-    if (categoryIds && categoryIds.length > 0) {
-      query = query.in('product_categories.category_id', categoryIds)
-    } else if (categoryId) {
-      query = query.eq('product_categories.category_id', categoryId)
+    // Filtre par catégorie
+    if (productIds) {
+      if (productIds.length === 0) {
+        // Aucun produit pour cette catégorie
+        return {
+          data: [],
+          total: 0,
+          page,
+          limit,
+          totalPages: 0,
+          hasNext: false,
+          hasPrev: false
+        }
+      }
+      query = query.in('id', productIds)
+    }
+
+    // Filtres de statut - CÔTÉ SERVEUR pour performance
+    if (visible !== undefined) {
+      query = query.eq('visible', visible)
+    }
+    
+    if (vendable !== undefined) {
+      query = query.eq('vendable', vendable)
+    }
+
+    // Filtres de stock - CÔTÉ SERVEUR
+    if (stockLevel) {
+      switch (stockLevel) {
+        case 'in_stock':
+          query = query.gt('stock', 10)
+          break
+        case 'low_stock':
+          query = query.and('stock.gt.0,stock.lte.10')
+          break
+        case 'out_of_stock':
+          query = query.eq('stock', 0)
+          break
+      }
+    }
+
+    // Filtres de prix - CÔTÉ SERVEUR
+    if (priceMin !== undefined) {
+      query = query.gte('prix', priceMin)
+    }
+    if (priceMax !== undefined) {
+      query = query.lte('prix', priceMax)
     }
 
     // Tri et pagination
@@ -121,9 +203,20 @@ export const productService = {
     }
   },
 
-  // Méthode pour le catalogue public - retourne seulement les produits visibles avec pagination
+  // Méthode pour le catalogue public - retourne seulement les produits visibles avec pagination OPTIMISÉE
   async getVisibleProductsPaginated(params: PaginationParams): Promise<PaginatedResponse<Product>> {
-    const { page, limit, search, categoryId, categoryIds, sortBy = 'created_at', sortOrder = 'desc' } = params
+    const { 
+      page, 
+      limit, 
+      search, 
+      categoryId, 
+      categoryIds, 
+      sortBy = 'name', 
+      sortOrder = 'asc',
+      stockLevel,
+      priceMin,
+      priceMax
+    } = params
     const offset = (page - 1) * limit
 
     // Si on a des categoryIds, on doit d'abord obtenir les product_ids correspondants
@@ -160,18 +253,41 @@ export const productService = {
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))', { count: 'exact' })
       .eq('visible', true)
-      .eq('vendable', true)
 
-    // Filtres
+    // Filtres de recherche
     if (search) {
       query = query.or(`name.ilike.%${search}%,reference.ilike.%${search}%`)
     }
 
+    // Filtre par catégorie
     if (productIds && productIds.length > 0) {
       query = query.in('id', productIds)
     } else if (categoryId) {
       // Pour une seule catégorie, on peut utiliser la jointure
       query = query.eq('product_categories.category_id', categoryId)
+    }
+
+    // Filtres de stock - CÔTÉ SERVEUR pour performance catalog
+    if (stockLevel) {
+      switch (stockLevel) {
+        case 'in_stock':
+          query = query.gt('stock', 10)
+          break
+        case 'low_stock':
+          query = query.and('stock.gt.0,stock.lte.10')
+          break
+        case 'out_of_stock':
+          query = query.eq('stock', 0)
+          break
+      }
+    }
+
+    // Filtres de prix - CÔTÉ SERVEUR pour performance catalog
+    if (priceMin !== undefined) {
+      query = query.gte('prix', priceMin)
+    }
+    if (priceMax !== undefined) {
+      query = query.lte('prix', priceMax)
     }
 
     // Tri et pagination
@@ -260,7 +376,6 @@ export const productService = {
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
       .eq('visible', true)
-      .eq('vendable', true)
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -444,7 +559,6 @@ export const productService = {
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
       .eq('visible', true)
-      .eq('vendable', true)
       .or(`name.ilike.%${query}%,reference.ilike.%${query}%`)
 
     if (categoryId) {
@@ -462,7 +576,6 @@ export const productService = {
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
       .eq('visible', true)
-      .eq('vendable', true)
       .eq('product_categories.category_id', categoryId)
       .order('name', { ascending: true })
 

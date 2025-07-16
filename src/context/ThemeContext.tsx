@@ -9,7 +9,6 @@ interface MarketplaceContextType {
   refreshSettings: () => void
   theme: {
     primaryColor: string
-    secondaryColor: string
     companyName: string
     logoUrl: string | null
   }

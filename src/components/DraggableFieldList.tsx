@@ -1,26 +1,15 @@
 import React, { useState } from 'react'
-
-interface FieldDisplay {
-  id: string
-  field_name: string
-  field_type: 'system' | 'custom'
-  display_name: string
-  show_in_catalog: boolean
-  show_in_product: boolean
-  catalog_order: number
-  product_order: number
-  active: boolean
-}
+import type { ProductFieldDisplay } from '../services/productService'
 
 interface DraggableFieldListProps {
-  fields: FieldDisplay[]
+  fields: ProductFieldDisplay[]
   type: 'catalog' | 'product'
   onReorder: (updates: { id: string, catalog_order?: number, product_order?: number }[]) => void
   onToggleVisibility: (id: string, type: 'catalog' | 'product') => Promise<void>
 }
 
 const FieldItem: React.FC<{
-  field: FieldDisplay
+  field: ProductFieldDisplay
   type: 'catalog' | 'product'
   onToggleVisibility: (id: string, type: 'catalog' | 'product') => Promise<void>
   onMoveUp: () => void
@@ -141,60 +130,60 @@ const DraggableFieldList: React.FC<DraggableFieldListProps> = ({
 }) => {
   // Trier les éléments selon l'ordre actuel
   const sortedItems = [...fields].sort((a, b) => {
-    const orderA = type === 'catalog' ? a.catalog_order : a.product_order
-    const orderB = type === 'catalog' ? b.catalog_order : b.product_order
+    const orderA = type === 'catalog' ? (a.catalog_order || 0) : (a.product_order || 0)
+    const orderB = type === 'catalog' ? (b.catalog_order || 0) : (b.product_order || 0)
     return orderA - orderB
   })
 
   const handleMoveUp = (index: number) => {
     if (index === 0) return // Déjà en haut
 
-    const newItems = [...sortedItems]
-    const item = newItems[index]
-    const itemAbove = newItems[index - 1]
+    const item = sortedItems[index]
+    const itemAbove = sortedItems[index - 1]
 
     // Échanger les positions
-    const tempOrder = type === 'catalog' ? item.catalog_order : item.product_order
-    if (type === 'catalog') {
-      item.catalog_order = itemAbove.catalog_order
-      itemAbove.catalog_order = tempOrder
-    } else {
-      item.product_order = itemAbove.product_order
-      itemAbove.product_order = tempOrder
-    }
+    const itemOrder = type === 'catalog' ? (item.catalog_order || 0) : (item.product_order || 0)
+    const itemAboveOrder = type === 'catalog' ? (itemAbove.catalog_order || 0) : (itemAbove.product_order || 0)
 
     // Créer les mises à jour
     const updates = [
-      { id: item.id, [type === 'catalog' ? 'catalog_order' : 'product_order']: item[type === 'catalog' ? 'catalog_order' : 'product_order'] },
-      { id: itemAbove.id, [type === 'catalog' ? 'catalog_order' : 'product_order']: itemAbove[type === 'catalog' ? 'catalog_order' : 'product_order'] }
+      { 
+        id: item.id, 
+        [type === 'catalog' ? 'catalog_order' : 'product_order']: itemAboveOrder 
+      },
+      { 
+        id: itemAbove.id, 
+        [type === 'catalog' ? 'catalog_order' : 'product_order']: itemOrder 
+      }
     ]
 
+    console.log('Move Up - Updates:', updates)
     onReorder(updates)
   }
 
   const handleMoveDown = (index: number) => {
     if (index === sortedItems.length - 1) return // Déjà en bas
 
-    const newItems = [...sortedItems]
-    const item = newItems[index]
-    const itemBelow = newItems[index + 1]
+    const item = sortedItems[index]
+    const itemBelow = sortedItems[index + 1]
 
     // Échanger les positions
-    const tempOrder = type === 'catalog' ? item.catalog_order : item.product_order
-    if (type === 'catalog') {
-      item.catalog_order = itemBelow.catalog_order
-      itemBelow.catalog_order = tempOrder
-    } else {
-      item.product_order = itemBelow.product_order
-      itemBelow.product_order = tempOrder
-    }
+    const itemOrder = type === 'catalog' ? (item.catalog_order || 0) : (item.product_order || 0)
+    const itemBelowOrder = type === 'catalog' ? (itemBelow.catalog_order || 0) : (itemBelow.product_order || 0)
 
     // Créer les mises à jour
     const updates = [
-      { id: item.id, [type === 'catalog' ? 'catalog_order' : 'product_order']: item[type === 'catalog' ? 'catalog_order' : 'product_order'] },
-      { id: itemBelow.id, [type === 'catalog' ? 'catalog_order' : 'product_order']: itemBelow[type === 'catalog' ? 'catalog_order' : 'product_order'] }
+      { 
+        id: item.id, 
+        [type === 'catalog' ? 'catalog_order' : 'product_order']: itemBelowOrder 
+      },
+      { 
+        id: itemBelow.id, 
+        [type === 'catalog' ? 'catalog_order' : 'product_order']: itemOrder 
+      }
     ]
 
+    console.log('Move Down - Updates:', updates)
     onReorder(updates)
   }
 

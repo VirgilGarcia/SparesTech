@@ -12,7 +12,6 @@ export interface MarketplaceSettings {
   company_name: string | null
   logo_url: string | null
   primary_color: string
-  secondary_color: string
   created_at?: string
   updated_at?: string
 }
@@ -22,7 +21,7 @@ export const settingsService = {
   getSettings: async (userId: string): Promise<MarketplaceSettings> => {
     const { data, error } = await supabase
       .from('marketplace_settings')
-      .select('id, user_id, public_access, show_prices, show_stock, show_categories, company_name, logo_url, primary_color, secondary_color, created_at, updated_at')
+      .select('id, user_id, public_access, show_prices, show_stock, show_categories, company_name, logo_url, primary_color, created_at, updated_at')
       .eq('user_id', userId)
       .single()
 
@@ -36,8 +35,7 @@ export const settingsService = {
         show_categories: true,
         company_name: '',
         logo_url: null,
-        primary_color: '#10b981',
-        secondary_color: '#f3f4f6'
+        primary_color: '#10b981'
       }
 
       const { data: newSettings, error: createError } = await supabase
@@ -59,7 +57,7 @@ export const settingsService = {
       .from('marketplace_settings')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('user_id', userId)
-      .select('id, user_id, public_access, show_prices, show_stock, show_categories, company_name, logo_url, primary_color, secondary_color, created_at, updated_at')
+      .select('id, user_id, public_access, show_prices, show_stock, show_categories, company_name, logo_url, primary_color, created_at, updated_at')
       .single()
 
     if (error) throw error
@@ -74,7 +72,7 @@ export const settingsService = {
       // Récupérer les paramètres généraux (premier enregistrement trouvé)
       const { data, error } = await supabase
         .from('marketplace_settings')
-        .select('id, user_id, public_access, show_prices, show_stock, show_categories, company_name, logo_url, primary_color, secondary_color, created_at, updated_at')
+        .select('id, user_id, public_access, show_prices, show_stock, show_categories, company_name, logo_url, primary_color, created_at, updated_at')
         .limit(1)
         .single()
 
@@ -87,7 +85,6 @@ export const settingsService = {
           company_name: 'Marketplace',
           logo_url: null,
           primary_color: '#10b981',
-          secondary_color: '#f3f4f6',
           show_prices: true,
           show_stock: true,
           show_categories: true
@@ -106,7 +103,6 @@ export const settingsService = {
         company_name: 'Marketplace',
         logo_url: null,
         primary_color: '#10b981',
-        secondary_color: '#f3f4f6',
         show_prices: true,
         show_stock: true,
         show_categories: true

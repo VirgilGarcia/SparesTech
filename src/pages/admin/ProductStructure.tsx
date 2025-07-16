@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
+import { Link, Navigate } from 'react-router-dom'
 import { useAuth } from '../../context/AuthContext'
 import { useMarketplaceTheme } from '../../context/ThemeContext'
-import { Navigate } from 'react-router-dom'
+import { supabase } from '../../lib/supabase'
 import Header from '../../components/Header'
 import DraggableFieldList from '../../components/DraggableFieldList'
 import { productStructureService } from '../../services/productStructureService'
@@ -10,6 +11,8 @@ import type { ProductField, ProductFieldDisplay } from '../../services/productSe
 const ProductStructure: React.FC = () => {
   const { user, loading: authLoading } = useAuth()
   const { theme } = useMarketplaceTheme()
+  const [userRole, setUserRole] = useState<string | null>(null)
+  const [roleLoading, setRoleLoading] = useState(false)
   const [fields, setFields] = useState<ProductField[]>([])
   const [fieldDisplay, setFieldDisplay] = useState<ProductFieldDisplay[]>([])
   const [loading, setLoading] = useState(true)
@@ -20,6 +23,8 @@ const ProductStructure: React.FC = () => {
   const [showAddField, setShowAddField] = useState(false)
   const [editingField, setEditingField] = useState<ProductField | null>(null)
   const [editingDisplay, setEditingDisplay] = useState<ProductFieldDisplay | null>(null)
+  const [fieldToDeactivate, setFieldToDeactivate] = useState<ProductField | null>(null)
+  const [showDeactivateModal, setShowDeactivateModal] = useState(false)
   
   // Formulaire nouveau champ
   const [newField, setNewField] = useState({
@@ -41,11 +46,39 @@ const ProductStructure: React.FC = () => {
     default_value: ''
   })
 
+  // Charger le rôle utilisateur
   useEffect(() => {
     if (user) {
-      loadData()
+      loadUserRole()
     }
   }, [user])
+
+  useEffect(() => {
+    if (user && userRole === 'admin') {
+      loadData()
+    }
+  }, [user, userRole])
+
+  const loadUserRole = async () => {
+    if (!user) return
+    
+    try {
+      setRoleLoading(true)
+      const { data, error } = await supabase
+        .from('user_profiles')
+        .select('role')
+        .eq('id', user.id)
+        .single()
+
+      if (error) throw error
+      setUserRole(data.role)
+    } catch (error) {
+      console.error('Erreur lors du chargement du rôle:', error)
+      setUserRole('client')
+    } finally {
+      setRoleLoading(false)
+    }
+  }
 
   const loadData = async () => {
     try {
@@ -53,6 +86,15 @@ const ProductStructure: React.FC = () => {
       
       // Initialiser les champs système si nécessaire
       await productStructureService.initializeSystemFields()
+      
+      // Corriger les valeurs d'ordre seulement si pas encore fait
+      const migrationKey = 'fieldOrderMigrationDone_v1'
+      const migrationDone = localStorage.getItem(migrationKey)
+      if (!migrationDone) {
+        console.log('🔧 Première migration des ordres de champs...')
+        await productStructureService.fixOrderValues()
+        localStorage.setItem(migrationKey, 'true')
+      }
       
       const [fieldsData, displayData] = await Promise.all([
         productStructureService.getAllFields(),
@@ -175,14 +217,25 @@ const ProductStructure: React.FC = () => {
     })
   }
 
-  const handleDeleteField = async (id: string) => {
-    if (confirm('Êtes-vous sûr de vouloir supprimer ce champ ?')) {
-      try {
-        await productStructureService.deleteField(id)
-        loadData()
-      } catch (err) {
-        setError(err instanceof Error ? err.message : 'Erreur lors de la suppression')
-      }
+  const handleDeactivateField = (field: ProductField) => {
+    setFieldToDeactivate(field)
+    setShowDeactivateModal(true)
+  }
+
+  const confirmDeactivateField = async () => {
+    if (!fieldToDeactivate) return
+    
+    try {
+      await productStructureService.updateField(fieldToDeactivate.id, { active: false })
+      setSuccessMessage('Champ désactivé avec succès')
+      setTimeout(() => setSuccessMessage(null), 3000)
+      loadData()
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Erreur lors de la désactivation')
+      setTimeout(() => setError(null), 5000)
+    } finally {
+      setShowDeactivateModal(false)
+      setFieldToDeactivate(null)
     }
   }
 
@@ -241,7 +294,9 @@ const ProductStructure: React.FC = () => {
 
   const handleReorder = async (updates: { id: string, catalog_order?: number, product_order?: number }[]) => {
     try {
-      // Mettre à jour l'état local immédiatement pour une meilleure UX
+      console.log('🎯 handleReorder appelé avec:', updates)
+      
+      // Mettre à jour l'état local immédiatement pour une UX fluide
       setFieldDisplay(prev => prev.map(field => {
         const update = updates.find(u => u.id === field.id)
         if (update) {
@@ -253,15 +308,23 @@ const ProductStructure: React.FC = () => {
         }
         return field
       }))
-
-      // Appeler l'API en arrière-plan
+      
+      // Sauvegarder en arrière-plan
       await productStructureService.reorderFields(updates)
+      
       setSuccessMessage('Ordre mis à jour avec succès')
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
-      // En cas d'erreur, recharger les données pour revenir à l'état correct
-      console.error('Erreur lors de la réorganisation:', err)
-      loadData()
+      console.error('❌ Erreur lors de la réorganisation:', err)
+      
+      // En cas d'erreur, recharger seulement les données d'affichage sans tout reloader
+      try {
+        const displayData = await productStructureService.getAllFieldDisplay()
+        setFieldDisplay(displayData)
+      } catch (reloadErr) {
+        console.error('Erreur lors du rechargement des données:', reloadErr)
+      }
+      
       setError(err instanceof Error ? err.message : 'Erreur lors de la réorganisation')
       setTimeout(() => setError(null), 5000)
     }
@@ -300,7 +363,11 @@ const ProductStructure: React.FC = () => {
                 ? setEditField({ ...editField, name: e.target.value })
                 : setNewField({ ...newField, name: e.target.value })
               }
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
+              style={{ 
+                focusRingColor: theme.primaryColor,
+                focusBorderColor: theme.primaryColor 
+              }}
               placeholder="ex: marque, dimensions, couleur"
               required
               disabled={!!editingField}
@@ -321,7 +388,11 @@ const ProductStructure: React.FC = () => {
                 ? setEditField({ ...editField, label: e.target.value })
                 : setNewField({ ...newField, label: e.target.value })
               }
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
+              style={{ 
+                focusRingColor: theme.primaryColor,
+                focusBorderColor: theme.primaryColor 
+              }}
               placeholder="ex: Marque, Dimensions, Couleur"
               required
             />
@@ -339,7 +410,11 @@ const ProductStructure: React.FC = () => {
                 ? setEditField({ ...editField, type: e.target.value as ProductField['type'] })
                 : setNewField({ ...newField, type: e.target.value as ProductField['type'] })
               }
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
+              style={{ 
+                focusRingColor: theme.primaryColor,
+                focusBorderColor: theme.primaryColor 
+              }}
             >
               <option value="text">Texte</option>
               <option value="number">Nombre</option>
@@ -360,7 +435,11 @@ const ProductStructure: React.FC = () => {
                 ? setEditField({ ...editField, default_value: e.target.value })
                 : setNewField({ ...newField, default_value: e.target.value })
               }
-              className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500 transition-colors"
+              className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
+              style={{ 
+                focusRingColor: theme.primaryColor,
+                focusBorderColor: theme.primaryColor 
+              }}
               placeholder="Valeur par défaut"
             />
           </div>
@@ -414,53 +493,61 @@ const ProductStructure: React.FC = () => {
   )
 
   const renderFieldsList = () => (
-    <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden">
-      <div className="px-6 py-4 border-b border-gray-100">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-lg font-semibold text-gray-900">Champs personnalisés</h3>
-            <p className="text-sm text-gray-600 mt-1">
-              Créez et gérez vos champs personnalisés pour les produits
-            </p>
-          </div>
-          <div className="flex space-x-2">
-            <button
-              onClick={() => setShowAddField(true)}
-              className="px-4 py-2 text-sm bg-emerald-600 text-white rounded-lg hover:bg-emerald-700 transition-colors font-medium"
-            >
-              + Ajouter un champ
-            </button>
+    <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden">
+      <div className="px-6 py-5 border-b border-gray-100">
+        <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center"
+                 style={{ backgroundColor: `${theme.primaryColor}20` }}>
+              <svg className="w-5 h-5" style={{ color: theme.primaryColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Champs personnalisés</h3>
+              <p className="text-gray-600">
+                Créez et gérez vos champs personnalisés pour les produits
+              </p>
+            </div>
           </div>
         </div>
       </div>
       
       {fields.length === 0 ? (
-        <div className="text-center py-12">
-          <div className="w-16 h-16 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
-            <svg className="w-8 h-8 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <div className="text-center py-16">
+          <div className="w-20 h-20 rounded-full flex items-center justify-center mx-auto mb-6"
+               style={{ backgroundColor: `${theme.primaryColor}20` }}>
+            <svg className="w-10 h-10" style={{ color: theme.primaryColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
             </svg>
           </div>
-          <h4 className="text-lg font-medium text-gray-900 mb-2">Aucun champ personnalisé</h4>
-          <p className="text-gray-500 text-sm mb-6">Commencez par créer votre premier champ personnalisé</p>
+          <h4 className="text-2xl font-bold text-gray-900 mb-3">Aucun champ personnalisé</h4>
+          <p className="text-gray-600 mb-8 max-w-md mx-auto leading-relaxed">
+            Commencez par créer votre premier champ personnalisé pour enrichir vos fiches produits avec des informations spécifiques à votre métier.
+          </p>
           <button
             onClick={() => setShowAddField(true)}
-            className="text-white px-6 py-3 rounded-lg hover:opacity-90 transition-colors font-medium"
+            className="px-8 py-4 text-white rounded-xl font-semibold hover:opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
             style={{ backgroundColor: theme.primaryColor }}
           >
-            Créer un champ
+            <div className="flex items-center gap-2">
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6v6m0 0v6m0-6h6m-6 0H6" />
+              </svg>
+              Créer votre premier champ
+            </div>
           </button>
         </div>
       ) : (
         <div className="p-6">
-          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
             {fields.map((field) => (
-              <div key={field.id} className={`bg-white border rounded-lg p-4 hover:shadow-md transition-all duration-200 ${
-                field.active ? 'border-gray-200' : 'border-gray-100 bg-gray-50'
+              <div key={field.id} className={`bg-white border-2 rounded-2xl p-6 hover:shadow-xl transition-all duration-300 transform hover:scale-105 ${
+                field.active ? 'border-gray-200 hover:border-gray-300' : 'border-gray-100 bg-gray-50'
               }`}>
-                <div className="flex items-start justify-between mb-3">
-                  <div className="flex items-center space-x-3">
-                    <div className={`w-10 h-10 rounded-full flex items-center justify-center ${
+                <div className="flex items-start justify-between mb-4">
+                  <div className="flex items-start gap-3">
+                    <div className={`w-12 h-12 rounded-2xl flex items-center justify-center ${
                       field.type === 'text' ? 'bg-blue-100' :
                       field.type === 'number' ? 'bg-green-100' :
                       field.type === 'boolean' ? 'bg-purple-100' :
@@ -469,7 +556,7 @@ const ProductStructure: React.FC = () => {
                       field.type === 'date' ? 'bg-pink-100' :
                       'bg-gray-100'
                     }`}>
-                      <svg className={`w-5 h-5 ${
+                      <svg className={`w-6 h-6 ${
                         field.type === 'text' ? 'text-blue-600' :
                         field.type === 'number' ? 'text-green-600' :
                         field.type === 'boolean' ? 'text-purple-600' :
@@ -481,12 +568,12 @@ const ProductStructure: React.FC = () => {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
                       </svg>
                     </div>
-                    <div>
-                      <h4 className="text-sm font-medium text-gray-900">{field.label}</h4>
-                      <p className="text-xs text-gray-500">Nom: {field.name}</p>
+                    <div className="flex-1">
+                      <h4 className="font-semibold text-gray-900 mb-1">{field.label}</h4>
+                      <p className="text-sm text-gray-500 font-mono">{field.name}</p>
                     </div>
                   </div>
-                  <span className={`px-2 py-1 text-xs rounded-full ${
+                  <span className={`px-3 py-1 text-xs font-semibold rounded-full ${
                     field.active ? 'bg-green-100 text-green-800' : 'bg-red-100 text-red-800'
                   }`}>
                     {field.active ? 'Actif' : 'Inactif'}
@@ -522,29 +609,44 @@ const ProductStructure: React.FC = () => {
                   )}
                 </div>
                 
-                <div className="flex items-center justify-between pt-3 border-t border-gray-100">
+                <div className="flex items-center justify-between pt-4 border-t border-gray-100">
                   {field.active ? (
-                    <>
+                    <div className="flex gap-2 w-full">
                       <button
                         onClick={() => handleEditField(field)}
-                        className="text-sm font-medium hover:opacity-80 transition-opacity"
+                        className="flex-1 px-3 py-2 text-sm font-medium rounded-lg hover:bg-gray-50 transition-all duration-200"
                         style={{ color: theme.primaryColor }}
                       >
-                        Modifier
+                        <div className="flex items-center gap-2 justify-center">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z" />
+                          </svg>
+                          Modifier
+                        </div>
                       </button>
                       <button
-                        onClick={() => handleDeleteField(field.id)}
-                        className="text-sm text-red-600 hover:text-red-800 transition-colors"
+                        onClick={() => handleDeactivateField(field)}
+                        className="flex-1 px-3 py-2 text-sm font-medium text-orange-600 hover:text-orange-800 hover:bg-orange-50 rounded-lg transition-all duration-200"
                       >
-                        Supprimer
+                        <div className="flex items-center gap-2 justify-center">
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M18.364 18.364A9 9 0 005.636 5.636m12.728 12.728L5.636 5.636m12.728 12.728L18.364 5.636M5.636 18.364l12.728-12.728" />
+                          </svg>
+                          Désactiver
+                        </div>
                       </button>
-                    </>
+                    </div>
                   ) : (
                     <button
                       onClick={() => handleRestoreField(field.id)}
-                      className="text-sm text-green-600 hover:text-green-800 transition-colors"
+                      className="w-full px-3 py-2 text-sm font-medium text-green-600 hover:text-green-800 hover:bg-green-50 rounded-lg transition-all duration-200"
                     >
-                      Restaurer
+                      <div className="flex items-center gap-2 justify-center">
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" />
+                        </svg>
+                        Restaurer
+                      </div>
                     </button>
                   )}
                 </div>
@@ -564,24 +666,43 @@ const ProductStructure: React.FC = () => {
     )
 
     return (
-      <div className="bg-white rounded-lg shadow-sm border border-gray-100 overflow-hidden mt-6">
-        <div className="px-6 py-4 border-b border-gray-100">
-          <h3 className="text-lg font-semibold text-gray-900">Configuration de l'affichage</h3>
-          <p className="text-sm text-gray-600 mt-1">
-            Glissez-déposez pour réorganiser et configurez la visibilité des champs
-          </p>
+      <div className="bg-white rounded-2xl shadow-lg border border-gray-100 overflow-hidden mt-8">
+        <div className="px-6 py-5 border-b border-gray-100">
+          <div className="flex items-center gap-3">
+            <div className="w-8 h-8 rounded-full flex items-center justify-center"
+                 style={{ backgroundColor: `${theme.primaryColor}20` }}>
+              <svg className="w-5 h-5" style={{ color: theme.primaryColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4" />
+              </svg>
+            </div>
+            <div>
+              <h3 className="text-xl font-bold text-gray-900">Configuration de l'affichage</h3>
+              <p className="text-gray-600">
+                Glissez-déposez pour réorganiser et configurez la visibilité des champs
+              </p>
+            </div>
+          </div>
         </div>
         
         <div className="p-6">
           <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
             {/* Configuration du catalogue */}
             <div>
-              <div className="mb-4 p-4 bg-blue-50 border border-blue-200 rounded-lg">
-                <h4 className="text-sm font-semibold text-blue-800 mb-2">📋 Configuration du Catalogue</h4>
-                <p className="text-xs text-blue-700">
-                  Seuls les champs système peuvent être affichés dans le catalogue. 
-                  Les champs personnalisés ne sont pas disponibles ici pour maintenir un design cohérent.
-                </p>
+              <div className="mb-6 p-6 bg-gradient-to-r from-blue-50 to-indigo-50 border border-blue-200 rounded-2xl">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-full bg-blue-100 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-blue-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold text-blue-800 mb-2">Configuration du Catalogue</h4>
+                    <p className="text-blue-700 leading-relaxed">
+                      Seuls les champs système peuvent être affichés dans le catalogue. 
+                      Les champs personnalisés ne sont pas disponibles ici pour maintenir un design cohérent.
+                    </p>
+                  </div>
+                </div>
               </div>
               <DraggableFieldList
                 fields={allFields.filter(f => f.field_type === 'system')}
@@ -593,12 +714,21 @@ const ProductStructure: React.FC = () => {
 
             {/* Configuration de la page produit */}
             <div>
-              <div className="mb-4 p-4 bg-green-50 border border-green-200 rounded-lg">
-                <h4 className="text-sm font-semibold text-green-800 mb-2">🎨 Configuration de la Page Produit</h4>
-                <p className="text-xs text-green-700">
-                  Tous les champs (système et personnalisés) peuvent être affichés ici. 
-                  Les champs personnalisés utilisent des composants de design spécifiques selon leur type.
-                </p>
+              <div className="mb-6 p-6 bg-gradient-to-r from-green-50 to-emerald-50 border border-green-200 rounded-2xl">
+                <div className="flex items-start gap-4">
+                  <div className="w-12 h-12 rounded-full bg-green-100 flex items-center justify-center flex-shrink-0">
+                    <svg className="w-6 h-6 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zM7 3H5a2 2 0 00-2 2v12a4 4 0 004 4h2M9 3h10a2 2 0 012 2v12a4 4 0 01-4 4H9" />
+                    </svg>
+                  </div>
+                  <div>
+                    <h4 className="text-lg font-semibold text-green-800 mb-2">Configuration de la Page Produit</h4>
+                    <p className="text-green-700 leading-relaxed">
+                      Tous les champs (système et personnalisés) peuvent être affichés ici. 
+                      Les champs personnalisés utilisent des composants de design spécifiques selon leur type.
+                    </p>
+                  </div>
+                </div>
               </div>
               <DraggableFieldList
                 fields={allFields}
@@ -613,18 +743,53 @@ const ProductStructure: React.FC = () => {
     )
   }
 
-  // Chargement auth
-  if (authLoading) {
+  // Chargements et accès
+  if (authLoading || roleLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
-        <div className="text-gray-600">Chargement de l'authentification...</div>
+        <div className="text-center">
+          <div className="w-8 h-8 border-3 rounded-full animate-spin mx-auto mb-4"
+               style={{ 
+                 borderColor: `${theme.primaryColor}20`,
+                 borderTopColor: theme.primaryColor 
+               }}></div>
+          <div className="text-gray-600">
+            {roleLoading ? 'Vérification des permissions...' : 'Chargement...'}
+          </div>
+        </div>
       </div>
     )
   }
 
-  // Redirection si pas connecté
   if (!user) {
     return <Navigate to="/login" replace />
+  }
+  
+  if (userRole !== 'admin') {
+    return (
+      <div className="min-h-screen bg-gray-50 flex items-center justify-center">
+        <div className="text-center max-w-md mx-auto p-8">
+          <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-8">
+            <div className="w-16 h-16 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-6">
+              <svg className="w-8 h-8 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+              </svg>
+            </div>
+            <h1 className="text-2xl font-bold text-gray-900 mb-4">Accès Refusé</h1>
+            <p className="text-gray-600 mb-6 leading-relaxed">Vous devez être administrateur pour accéder à cette page.</p>
+            <div className="space-y-3">
+              <Link 
+                to="/admin"
+                className="block w-full text-white px-6 py-3 rounded-xl hover:opacity-90 transition-colors text-center font-medium"
+                style={{ backgroundColor: theme.primaryColor }}
+              >
+                Retour au dashboard
+              </Link>
+            </div>
+          </div>
+        </div>
+      </div>
+    )
   }
 
   if (loading) {
@@ -633,7 +798,12 @@ const ProductStructure: React.FC = () => {
         <Header />
         <div className="w-full max-w-none px-4 py-6">
           <div className="flex justify-center items-center h-64">
-            <div className="text-lg">Chargement...</div>
+            <div className="w-8 h-8 border-3 rounded-full animate-spin mx-auto mb-4"
+                 style={{ 
+                   borderColor: `${theme.primaryColor}20`,
+                   borderTopColor: theme.primaryColor 
+                 }}></div>
+            <div className="text-gray-600">Chargement de la structure...</div>
           </div>
         </div>
       </div>
@@ -645,34 +815,75 @@ const ProductStructure: React.FC = () => {
       <Header />
       
       <div className="w-full max-w-none px-4 py-6">
-        {/* Titre et actions */}
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-gray-900 mb-1">Structure des produits</h1>
-            <p className="text-sm text-gray-600">Gérez les champs personnalisés et l'affichage des produits</p>
-          </div>
-          <div className="flex gap-2">
-            <button
-              onClick={() => setShowAddField(!showAddField)}
-              className="text-white px-4 py-2 rounded-lg hover:opacity-90 transition-colors font-medium text-sm"
-              style={{ backgroundColor: theme.primaryColor }}
+        {/* En-tête avec navigation */}
+        <div className="mb-8">
+          <div className="flex items-center gap-4 mb-6">
+            <Link 
+              to="/admin/settings" 
+              className="flex items-center gap-2 text-gray-600 hover:text-gray-800 transition-colors duration-200 p-2 rounded-lg hover:bg-gray-100"
             >
-              {showAddField ? 'Annuler' : 'Ajouter un champ'}
-            </button>
-
-
+              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+              </svg>
+              <span className="font-medium">Retour aux paramètres</span>
+            </Link>
+          </div>
+          
+          <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div className="flex items-center gap-4">
+              <div className="w-12 h-12 rounded-full flex items-center justify-center"
+                   style={{ backgroundColor: `${theme.primaryColor}20` }}>
+                <svg className="w-6 h-6" style={{ color: theme.primaryColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
+                </svg>
+              </div>
+              <div>
+                <h1 className="text-3xl font-bold text-gray-900 mb-2">Structure des produits</h1>
+                <p className="text-gray-600">Gérez les champs personnalisés et l'affichage des produits</p>
+              </div>
+            </div>
+            
+            {/* Actions */}
+            <div className="flex flex-wrap items-center gap-3">
+              <button
+                onClick={() => setShowAddField(!showAddField)}
+                className="px-6 py-3 text-white rounded-xl font-semibold hover:opacity-90 transition-all duration-200 shadow-lg hover:shadow-xl transform hover:scale-105"
+                style={{ backgroundColor: theme.primaryColor }}
+              >
+                <div className="flex items-center gap-2">
+                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d={showAddField ? "M6 18L18 6M6 6l12 12" : "M12 6v6m0 0v6m0-6h6m-6 0H6"} />
+                  </svg>
+                  {showAddField ? 'Annuler' : 'Ajouter un champ'}
+                </div>
+              </button>
+            </div>
           </div>
         </div>
 
-        {error && (
-          <div className="bg-red-100 border border-red-400 text-red-700 px-4 py-3 rounded mb-6">
-            {error}
+        {/* Messages de statut */}
+        {successMessage && (
+          <div className="mb-6 p-4 bg-green-50 border border-green-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-green-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                </svg>
+              </div>
+              <p className="text-green-700 font-medium">{successMessage}</p>
+            </div>
           </div>
         )}
-
-        {successMessage && (
-          <div className="bg-green-100 border border-green-400 text-green-700 px-4 py-3 rounded mb-6">
-            {successMessage}
+        {error && (
+          <div className="mb-6 p-4 bg-red-50 border border-red-200 rounded-xl">
+            <div className="flex items-center gap-3">
+              <div className="w-8 h-8 rounded-full bg-red-100 flex items-center justify-center">
+                <svg className="w-5 h-5 text-red-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                </svg>
+              </div>
+              <p className="text-red-700 font-medium">{error}</p>
+            </div>
           </div>
         )}
 
@@ -681,6 +892,66 @@ const ProductStructure: React.FC = () => {
         {renderFieldsList()}
         {renderDisplaySettings()}
       </div>
+
+      {/* Modal de confirmation de désactivation */}
+      {showDeactivateModal && fieldToDeactivate && (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+          <div className="bg-white rounded-2xl shadow-xl max-w-md w-full mx-4">
+            <div className="p-6">
+              <div className="flex items-center gap-4 mb-6">
+                <div className="w-12 h-12 rounded-full bg-orange-100 flex items-center justify-center">
+                  <svg className="w-6 h-6 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16c-.77.833.192 2.5 1.732 2.5z" />
+                  </svg>
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold text-gray-900">Désactiver le champ</h3>
+                  <p className="text-gray-600">Cette action peut être annulée</p>
+                </div>
+              </div>
+
+              <div className="mb-6">
+                <p className="text-gray-700 mb-4">
+                  Êtes-vous sûr de vouloir désactiver le champ <strong>"{fieldToDeactivate.label}"</strong> ?
+                </p>
+                <div className="bg-orange-50 border border-orange-200 rounded-lg p-4">
+                  <div className="flex items-start gap-3">
+                    <svg className="w-5 h-5 text-orange-600 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                    </svg>
+                    <div className="text-sm text-orange-800">
+                      <p className="font-medium mb-1">Le champ sera masqué mais conservé</p>
+                      <ul className="list-disc list-inside space-y-1 text-orange-700">
+                        <li>Les données existantes sont préservées</li>
+                        <li>Le champ n'apparaîtra plus dans les formulaires</li>
+                        <li>Vous pourrez le réactiver à tout moment</li>
+                      </ul>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex gap-3">
+                <button
+                  onClick={() => {
+                    setShowDeactivateModal(false)
+                    setFieldToDeactivate(null)
+                  }}
+                  className="flex-1 px-4 py-3 text-gray-600 border border-gray-300 rounded-xl hover:bg-gray-50 font-medium transition-colors"
+                >
+                  Annuler
+                </button>
+                <button
+                  onClick={confirmDeactivateField}
+                  className="flex-1 px-4 py-3 bg-orange-600 text-white rounded-xl hover:bg-orange-700 font-medium transition-colors"
+                >
+                  Désactiver
+                </button>
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   )
 }

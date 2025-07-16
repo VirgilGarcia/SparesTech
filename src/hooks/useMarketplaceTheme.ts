@@ -55,7 +55,6 @@ export function useMarketplaceTheme() {
     // Helpers pour faciliter l'usage
     theme: {
       primaryColor: settings?.primary_color || '#10b981',
-      secondaryColor: settings?.secondary_color || '#f3f4f6',
       companyName: settings?.company_name || 'SparesTech',
       logoUrl: settings?.logo_url || null
     },

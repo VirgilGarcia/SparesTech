@@ -93,7 +93,6 @@ export function useTheme() {
   // Valeurs par défaut sécurisées
   const defaultTheme = {
     primaryColor: '#10b981',
-    secondaryColor: '#f3f4f6',
     companyName: 'SparesTech',
     logoUrl: null
   }
@@ -112,7 +111,6 @@ export function useTheme() {
   // Retourner les valeurs avec fallback
   const theme = {
     primaryColor: state.settings?.primary_color || defaultTheme.primaryColor,
-    secondaryColor: state.settings?.secondary_color || defaultTheme.secondaryColor,
     companyName: state.settings?.company_name || defaultTheme.companyName,
     logoUrl: state.settings?.logo_url || defaultTheme.logoUrl
   }
