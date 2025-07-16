@@ -22,7 +22,6 @@ const ProductStructure: React.FC = () => {
   // États pour les formulaires
   const [showAddField, setShowAddField] = useState(false)
   const [editingField, setEditingField] = useState<ProductField | null>(null)
-  const [editingDisplay, setEditingDisplay] = useState<ProductFieldDisplay | null>(null)
   const [fieldToDeactivate, setFieldToDeactivate] = useState<ProductField | null>(null)
   const [showDeactivateModal, setShowDeactivateModal] = useState(false)
   
@@ -137,15 +136,6 @@ const ProductStructure: React.FC = () => {
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Erreur lors de l\'ajout du champ')
-    }
-  }
-
-  const handleUpdateField = async (id: string, updates: Partial<ProductField>) => {
-    try {
-      await productStructureService.updateField(id, updates)
-      loadData()
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Erreur lors de la modification')
     }
   }
 
@@ -365,8 +355,6 @@ const ProductStructure: React.FC = () => {
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
               style={{ 
-                focusRingColor: theme.primaryColor,
-                focusBorderColor: theme.primaryColor 
               }}
               placeholder="ex: marque, dimensions, couleur"
               required
@@ -390,8 +378,6 @@ const ProductStructure: React.FC = () => {
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
               style={{ 
-                focusRingColor: theme.primaryColor,
-                focusBorderColor: theme.primaryColor 
               }}
               placeholder="ex: Marque, Dimensions, Couleur"
               required
@@ -412,8 +398,6 @@ const ProductStructure: React.FC = () => {
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
               style={{ 
-                focusRingColor: theme.primaryColor,
-                focusBorderColor: theme.primaryColor 
               }}
             >
               <option value="text">Texte</option>
@@ -437,8 +421,6 @@ const ProductStructure: React.FC = () => {
               }
               className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
               style={{ 
-                focusRingColor: theme.primaryColor,
-                focusBorderColor: theme.primaryColor 
               }}
               placeholder="Valeur par défaut"
             />
@@ -831,14 +813,8 @@ const ProductStructure: React.FC = () => {
           
           <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
             <div className="flex items-center gap-4">
-              <div className="w-12 h-12 rounded-full flex items-center justify-center"
-                   style={{ backgroundColor: `${theme.primaryColor}20` }}>
-                <svg className="w-6 h-6" style={{ color: theme.primaryColor }} fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
-                </svg>
-              </div>
               <div>
-                <h1 className="text-3xl font-bold text-gray-900 mb-2">Structure des produits</h1>
+                <h1 className="text-3xl font-light text-gray-900 mb-2">Structure des produits</h1>
                 <p className="text-gray-600">Gérez les champs personnalisés et l'affichage des produits</p>
               </div>
             </div>

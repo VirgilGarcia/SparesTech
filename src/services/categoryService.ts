@@ -1,4 +1,5 @@
 import { supabase } from '../lib/supabase'
+import { tenantService } from './tenantService'
 
 export interface Category {
   id: number
@@ -9,6 +10,7 @@ export interface Category {
   path: string
   order_index: number
   is_active: boolean
+  tenant_id?: string
   created_at: string
   updated_at: string
   children?: Category[]
@@ -22,6 +24,7 @@ export interface CategoryTree {
   level: number
   path: string
   order_index: number
+  tenant_id?: string
   product_count?: number
   children: CategoryTree[]
 }
@@ -34,33 +37,54 @@ export interface ProductCategory {
   category?: Category
 }
 
+// Fonction utilitaire pour obtenir le tenant de l'utilisateur courant
+async function getCurrentTenantId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  
+  const tenant = await tenantService.getUserTenant(user.id)
+  return tenant?.id || null
+}
+
 export const categoryService = {
-  // === GESTION DES CATÉGORIES ===
-  async getAllCategories(): Promise<Category[]> {
+  
+  async getAllCategories(tenantId?: string): Promise<Category[]> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { data, error } = await supabase
       .from('categories')
       .select('*')
+      .eq('tenant_id', currentTenantId)
       .eq('is_active', true)
       .order('order_index', { ascending: true })
     if (error) throw error
     return data || []
   },
 
-  async getCategoryTree(): Promise<CategoryTree[]> {
-    const categories = await this.getAllCategories()
+  async getCategoryTree(tenantId?: string): Promise<CategoryTree[]> {
+    const categories = await this.getAllCategories(tenantId)
     const tree = this.buildCategoryTree(categories)
     
     // Ajouter le nombre de produits par catégorie
-    const productCounts = await this.getCategoryProductCounts()
+    const productCounts = await this.getCategoryProductCounts(tenantId)
     this.addProductCountsToTree(tree, productCounts)
     
     return tree
   },
 
-  async getCategoriesByLevel(level: number): Promise<Category[]> {
+  async getCategoriesByLevel(level: number, tenantId?: string): Promise<Category[]> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { data, error } = await supabase
       .from('categories')
       .select('*')
+      .eq('tenant_id', currentTenantId)
       .eq('is_active', true)
       .eq('level', level)
       .order('order_index')
@@ -70,10 +94,16 @@ export const categoryService = {
     return data || []
   },
 
-  async getCategoryChildren(parentId: number): Promise<Category[]> {
+  async getCategoryChildren(parentId: number, tenantId?: string): Promise<Category[]> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { data, error } = await supabase
       .from('categories')
       .select('*')
+      .eq('tenant_id', currentTenantId)
       .eq('is_active', true)
       .eq('parent_id', parentId)
       .order('order_index')
@@ -83,10 +113,16 @@ export const categoryService = {
     return data || []
   },
 
-  async getCategoryPath(categoryId: number): Promise<Category[]> {
+  async getCategoryPath(categoryId: number, tenantId?: string): Promise<Category[]> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { data, error } = await supabase
       .from('categories')
       .select('*')
+      .eq('tenant_id', currentTenantId)
       .eq('is_active', true)
       .eq('id', categoryId)
       .single()
@@ -101,6 +137,7 @@ export const categoryService = {
       const { data: parent, error: parentError } = await supabase
         .from('categories')
         .select('*')
+        .eq('tenant_id', currentTenantId)
         .eq('is_active', true)
         .eq('id', current.parent_id)
         .single()
@@ -119,13 +156,18 @@ export const categoryService = {
     name: string; 
     description?: string; 
     parent_id?: number | null;
-  }): Promise<Category> {
+  }, tenantId?: string): Promise<Category> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     // Calculer le level et le path
     let level = 0
     let path = category.name
 
     if (category.parent_id) {
-      const parent = await this.getCategoryById(category.parent_id)
+      const parent = await this.getCategoryById(category.parent_id, tenantId)
       if (parent) {
         level = parent.level + 1
         path = `${parent.path} > ${category.name}`
@@ -133,7 +175,7 @@ export const categoryService = {
     }
 
     // Calculer l'order_index
-    const siblings = await this.getCategoryChildren(category.parent_id || 0)
+    const siblings = await this.getCategoryChildren(category.parent_id || 0, tenantId)
     const orderIndex = siblings.length
 
     const { data, error } = await supabase
@@ -144,6 +186,7 @@ export const categoryService = {
         path,
         order_index: orderIndex,
         is_active: true,
+        tenant_id: currentTenantId,
         created_at: new Date().toISOString(),
         updated_at: new Date().toISOString()
       }])
@@ -155,14 +198,19 @@ export const categoryService = {
   },
 
   // Mettre à jour une catégorie
-  async updateCategory(id: number, updates: Partial<Category>): Promise<Category> {
+  async updateCategory(id: number, updates: Partial<Category>, tenantId?: string): Promise<Category> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     // Si le parent change, recalculer level et path
     if (updates.parent_id !== undefined) {
       let level = 0
       let path = updates.name || ''
 
       if (updates.parent_id) {
-        const parent = await this.getCategoryById(updates.parent_id)
+        const parent = await this.getCategoryById(updates.parent_id, tenantId)
         if (parent) {
           level = parent.level + 1
           path = `${parent.path} > ${updates.name || ''}`
@@ -177,6 +225,7 @@ export const categoryService = {
       .from('categories')
       .update({ ...updates, updated_at: new Date().toISOString() })
       .eq('id', id)
+      .eq('tenant_id', currentTenantId)
       .select()
       .single()
     
@@ -185,9 +234,14 @@ export const categoryService = {
   },
 
   // Supprimer une catégorie (hard delete)
-  async deleteCategory(id: number): Promise<void> {
+  async deleteCategory(id: number, tenantId?: string): Promise<void> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     // Vérifier s'il y a des enfants
-    const children = await this.getCategoryChildren(id)
+    const children = await this.getCategoryChildren(id, tenantId)
     if (children.length > 0) {
       throw new Error('Impossible de supprimer une catégorie qui a des sous-catégories')
     }
@@ -196,15 +250,22 @@ export const categoryService = {
       .from('categories')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', currentTenantId)
     
     if (error) throw error
   },
 
   // Obtenir une catégorie par ID
-  async getCategoryById(id: number): Promise<Category | null> {
+  async getCategoryById(id: number, tenantId?: string): Promise<Category | null> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { data, error } = await supabase
       .from('categories')
       .select('*')
+      .eq('tenant_id', currentTenantId)
       .eq('is_active', true)
       .eq('id', id)
       .single()
@@ -249,7 +310,7 @@ export const categoryService = {
     addCounts(tree)
   },
 
-  // === GESTION DES CATÉGORIES DE PRODUITS (RELATION MANY-TO-MANY) ===
+
   
   // Obtenir toutes les catégories d'un produit
   async getProductCategories(productId: string): Promise<ProductCategory[]> {
@@ -321,10 +382,22 @@ export const categoryService = {
   },
 
   // Obtenir le nombre de produits par catégorie
-  async getCategoryProductCounts(): Promise<Map<number, number>> {
+  async getCategoryProductCounts(tenantId?: string): Promise<Map<number, number>> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
+    // Joindre avec products pour filtrer par tenant
     const { data, error } = await supabase
       .from('product_categories')
-      .select('category_id')
+      .select(`
+        category_id,
+        products!inner (
+          tenant_id
+        )
+      `)
+      .eq('products.tenant_id', currentTenantId)
     
     if (error) throw error
 
@@ -337,10 +410,16 @@ export const categoryService = {
   },
 
   // Vérifier si des catégories existent
-  async hasCategories(): Promise<boolean> {
+  async hasCategories(tenantId?: string): Promise<boolean> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { data, error } = await supabase
       .from('categories')
       .select('id')
+      .eq('tenant_id', currentTenantId)
       .eq('is_active', true)
       .limit(1)
     

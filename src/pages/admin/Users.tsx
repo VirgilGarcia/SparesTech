@@ -31,7 +31,6 @@ function AdminUsers() {
   const [success, setSuccess] = useState('')
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
   const [userToArchive, setUserToArchive] = useState<{id: string, email: string, isActive: boolean} | null>(null)
-  const [archiving, setArchiving] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const [showArchived, setShowArchived] = useState(false)
 
@@ -269,7 +268,6 @@ function AdminUsers() {
     if (!userToArchive) return
 
     try {
-      setArchiving(true)
       
       const newStatus = !userToArchive.isActive
       const { error } = await supabase
@@ -288,7 +286,6 @@ function AdminUsers() {
       console.error('Erreur lors de la modification:', error)
       setError(error.message || 'Erreur lors de la modification')
     } finally {
-      setArchiving(false)
       setUserToArchive(null)
     }
   }
@@ -384,7 +381,7 @@ function AdminUsers() {
         {/* Titre et bouton */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Utilisateurs</h1>
+            <h1 className="text-3xl font-light text-gray-900 mb-2">Utilisateurs</h1>
             <p className="text-gray-600">Gestion des comptes et rôles</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
@@ -401,10 +398,6 @@ function AdminUsers() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                style={{ 
-                  focusRingColor: theme.primaryColor,
-                  focusBorderColor: theme.primaryColor 
-                }}
               />
             </div>
             
@@ -514,10 +507,6 @@ function AdminUsers() {
                   className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                     validationErrors.email ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                   }`}
-                  style={!validationErrors.email ? { 
-                    focusRingColor: theme.primaryColor,
-                    focusBorderColor: theme.primaryColor 
-                  } : {}}
                   required
                 />
                 {validationErrors.email && (
@@ -532,10 +521,6 @@ function AdminUsers() {
                   value={newUser.role}
                   onChange={(e) => setNewUser(prev => ({ ...prev, role: e.target.value as 'admin' | 'client' }))}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                  style={{ 
-                    focusRingColor: theme.primaryColor,
-                    focusBorderColor: theme.primaryColor 
-                  }}
                 >
                   <option value="client">Client</option>
                   <option value="admin">Administrateur</option>
@@ -685,10 +670,6 @@ function AdminUsers() {
                             value={userItem.role}
                             onChange={(e) => handleRoleChange(userItem.id, e.target.value as 'admin' | 'client')}
                             className="text-sm border border-gray-300 rounded-lg px-3 py-2 focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                            style={{ 
-                              focusRingColor: theme.primaryColor,
-                              focusBorderColor: theme.primaryColor 
-                            }}
                           >
                             <option value="client">Client</option>
                             <option value="admin">Admin</option>
@@ -735,7 +716,6 @@ function AdminUsers() {
           confirmText={userToArchive?.isActive ? "Archiver" : "Réactiver"}
           cancelText="Annuler"
           type={userToArchive?.isActive ? "warning" : "info"}
-          loading={archiving}
         />
       </div>
     </div>

@@ -6,7 +6,7 @@ import Header from '../components/Header'
 import { CheckCircle, Package, Mail, Clock } from 'lucide-react'
 
 function OrderSuccess() {
-  const { cartItems, setCartItems } = useCart()
+  const { setCartItems } = useCart()
   const { theme } = useMarketplaceTheme()
   const location = useLocation()
   const { orderNumber, totalAmount } = location.state || {}
@@ -27,15 +27,15 @@ function OrderSuccess() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       
-      <div className="max-w-4xl mx-auto px-6 py-12">
-        <div className="bg-white rounded-2xl border border-gray-200 p-8 text-center mb-8">
+      <div className="max-w-4xl mx-auto px-6 lg:px-8 py-12">
+        <div className="bg-white rounded-2xl border border-gray-200 p-8 lg:p-12 text-center mb-8">
           <div className="flex justify-center mb-6">
             <div className="w-20 h-20 rounded-full flex items-center justify-center" style={{ backgroundColor: `${theme.primaryColor}20` }}>
               <CheckCircle className="w-10 h-10" style={{ color: theme.primaryColor }} />
             </div>
           </div>
           
-          <h1 className="text-3xl font-bold text-gray-900 mb-4">Commande confirmée !</h1>
+          <h1 className="text-3xl font-light text-gray-900 mb-2">Commande confirmée !</h1>
           <p className="text-lg text-gray-600 mb-8">
             Votre commande a été enregistrée avec succès. 
             Vous recevrez un email de confirmation sous peu.
@@ -43,7 +43,7 @@ function OrderSuccess() {
 
           {/* Informations de la commande */}
           {orderNumber && (
-            <div className="bg-gray-50 rounded-xl p-6 mb-8">
+            <div className="bg-gray-50 rounded-2xl p-6 lg:p-8 mb-8">
               <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                 <div className="flex items-center gap-3">
                   <Package className="w-5 h-5 text-gray-600" />
@@ -68,7 +68,7 @@ function OrderSuccess() {
           )}
 
           {/* Prochaines étapes */}
-          <div className="bg-blue-50 rounded-xl p-6 mb-8">
+          <div className="bg-blue-50 rounded-2xl p-6 lg:p-8 mb-8">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Prochaines étapes</h3>
             <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-left">
               <div className="flex items-start gap-3">
@@ -98,14 +98,14 @@ function OrderSuccess() {
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
             <Link 
               to="/orders"
-              className="inline-flex items-center px-6 py-3 text-white rounded-xl font-medium hover:opacity-90 transition-colors"
+              className="inline-flex items-center px-8 py-3 text-white rounded-xl font-medium hover:opacity-90 transition-colors shadow-sm"
               style={{ backgroundColor: theme.primaryColor }}
             >
               Voir mes commandes
             </Link>
             <Link 
               to="/catalog"
-              className="inline-flex items-center px-6 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-medium"
+              className="inline-flex items-center px-8 py-3 bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-colors font-medium shadow-sm"
             >
               Continuer vos achats
             </Link>

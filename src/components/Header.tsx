@@ -5,7 +5,6 @@ import { useMarketplaceTheme } from '../context/ThemeContext'
 import { useCart } from '../context/CartContext'
 import { supabase } from '../lib/supabase'
 import { categoryService } from '../services/categoryService'
-import type { Category } from '../services/categoryService'
 
 function Header() {
   const { user, signOut } = useAuth()
@@ -15,9 +14,6 @@ function Header() {
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
-  const [roleLoading, setRoleLoading] = useState(false)
-  const [categories, setCategories] = useState<Category[]>([])
-  const [loadingCategories, setLoadingCategories] = useState(false)
 
   // Charger le rôle de l'utilisateur quand il se connecte
   useEffect(() => {
@@ -35,13 +31,10 @@ function Header() {
 
   const loadCategories = async () => {
     try {
-      setLoadingCategories(true)
-      const data = await categoryService.getAllCategories()
-      setCategories(data)
+      await categoryService.getAllCategories()
     } catch (error) {
       console.error('Erreur lors du chargement des catégories:', error)
     } finally {
-      setLoadingCategories(false)
     }
   }
 
@@ -49,7 +42,6 @@ function Header() {
     if (!user) return
     
     try {
-      setRoleLoading(true)
       const { data, error } = await supabase
         .from('user_profiles')
         .select('role')
@@ -66,7 +58,6 @@ function Header() {
       console.error('Erreur lors du chargement du rôle:', error)
       setUserRole('client')
     } finally {
-      setRoleLoading(false)
     }
   }
 
@@ -109,12 +100,12 @@ function Header() {
                 className="h-8 w-8 rounded-lg flex items-center justify-center text-white font-semibold text-sm transition-transform group-hover:scale-105"
                 style={{ backgroundColor: theme.primaryColor }}
               >
-                {settings?.company_name ? settings.company_name.charAt(0).toUpperCase() : 'M'}
+                {settings?.company_name ? settings.company_name.charAt(0).toUpperCase() : '...'}
               </div>
             )}
             
             <span className="text-xl font-semibold text-gray-900 group-hover:text-gray-700 transition-colors">
-              {settings?.company_name || 'Marketplace'}
+              {settings?.company_name || 'Chargement...'}
             </span>
           </Link>
 

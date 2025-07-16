@@ -1,8 +1,18 @@
 import { supabase } from '../lib/supabase'
 import type { ProductField, ProductFieldDisplay } from './productService'
+import { tenantService } from './tenantService'
+
+// Fonction utilitaire pour obtenir le tenant de l'utilisateur courant
+async function getCurrentTenantId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  
+  const tenant = await tenantService.getUserTenant(user.id)
+  return tenant?.id || null
+}
 
 export const productStructureService = {
-  // === GESTION DES CHAMPS PERSONNALISÉS ===
+  
   async getAllFields(): Promise<ProductField[]> {
     const { data, error } = await supabase
       .from('product_fields')
@@ -136,7 +146,7 @@ export const productStructureService = {
     return data
   },
 
-  // === GESTION DE L'AFFICHAGE ===
+
   async getAllFieldDisplay(): Promise<ProductFieldDisplay[]> {
     const { data, error } = await supabase
       .from('product_field_display')
@@ -255,7 +265,7 @@ export const productStructureService = {
     return data
   },
 
-  // === MÉTHODES UTILITAIRES ===
+
   async getCatalogFields(): Promise<ProductFieldDisplay[]> {
     const { data, error } = await supabase
       .from('product_field_display')
@@ -280,7 +290,7 @@ export const productStructureService = {
     return data || []
   },
 
-  // === INITIALISATION DES CHAMPS SYSTÈME ===
+
   async initializeSystemFields(): Promise<void> {
     const hasFields = await this.hasSystemFields()
     if (hasFields) {
@@ -408,7 +418,7 @@ export const productStructureService = {
     }
   },
 
-  // === MIGRATION POUR CORRIGER LES ORDRES ===
+
   async fixOrderValues(): Promise<void> {
     try {
       const allFields = await this.getAllFieldDisplay()
@@ -441,7 +451,7 @@ export const productStructureService = {
           catalogOrder++
         }
         
-        for (const field of customFields.sort((a, b) => (a.created_at || '') > (b.created_at || '') ? 1 : -1)) {
+        for (const field of customFields) {
           await this.updateFieldDisplay(field.id, { catalog_order: catalogOrder })
           catalogOrder++
         }
@@ -457,7 +467,7 @@ export const productStructureService = {
           productOrder++
         }
         
-        for (const field of customFields.sort((a, b) => (a.created_at || '') > (b.created_at || '') ? 1 : -1)) {
+        for (const field of customFields) {
           await this.updateFieldDisplay(field.id, { product_order: productOrder })
           productOrder++
         }
@@ -470,7 +480,7 @@ export const productStructureService = {
     }
   },
 
-  // === VALIDATION ===
+
   validateFieldName(name: string): boolean {
     // Nom doit être en minuscules, sans espaces, uniquement lettres, chiffres et underscores
     return /^[a-z][a-z0-9_]*$/.test(name)

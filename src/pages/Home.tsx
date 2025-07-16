@@ -3,7 +3,7 @@ import { useMarketplaceTheme } from '../context/ThemeContext'
 import { Link } from 'react-router-dom'
 
 function Home() {
-  const { theme, settings } = useMarketplaceTheme()
+  const { theme } = useMarketplaceTheme()
 
   return (
     <div className="min-h-screen bg-gray-50">

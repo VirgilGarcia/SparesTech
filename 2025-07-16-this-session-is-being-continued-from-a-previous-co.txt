@@ -1,0 +1,27 @@
+╭───────────────────────────────────────────────────╮
+│ ✻ Welcome to Claude Code!                         │
+│                                                   │
+│   /help for help, /status for your current setup  │
+│                                                   │
+│   cwd: C:\Users\garcia_v\Desktop\CODE\SparesTech  │
+╰───────────────────────────────────────────────────╯
+● Compact summary (ctrl+r to expand)
+  ⎿  Read src\services\productStructureService.ts (492 lines)
+  ⎿  Read src\services\orderService.ts (436 lines)
+  ⎿  Read src\services\productService.ts (663 lines)
+  ⎿  Read src\utils\errorHandler.ts (130 lines)
+  ⎿  Read src\hooks\useRole.ts (55 lines)
+  ⎿  Todo list read (7 items)
+  ⎿  Claude usage limit reached. Your limit will reset at 7pm (Europe/Paris).
+
+      • /upgrade to increase your usage limit.
+
+> va tu te souvenir pour tout a l'heure ?
+  ⎿  Claude usage limit reached. Your limit will reset at 7pm (Europe/Paris).
+
+      • /upgrade to increase your usage limit.
+
+> /cost 
+  ⎿ With your Claude Pro subscription, no need to monitor cost — your subscription includes 
+    Claude Code usage
+

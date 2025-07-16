@@ -2,6 +2,7 @@ import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
 import { supabase } from '../lib/supabase'
 import type { User, Session } from '@supabase/supabase-js'
+import { tenantService } from '../services/tenantService'
 
 interface AuthContextType {
   user: User | null
@@ -33,7 +34,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
 
     // Écouter les changements d'auth
     const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
+      async (_event, session) => {
         setSession(session)
         setUser(session?.user ?? null)
         setLoading(false)
@@ -52,7 +53,7 @@ export function AuthProvider({ children }: AuthProviderProps) {
   }
 
   const signUp = async (email: string, password: string, company: string) => {
-    const { error } = await supabase.auth.signUp({
+    const { data, error } = await supabase.auth.signUp({
       email,
       password,
       options: {
@@ -62,6 +63,21 @@ export function AuthProvider({ children }: AuthProviderProps) {
       },
     })
     if (error) throw error
+
+    // Si l'utilisateur est créé avec succès, initialiser le tenant
+    if (data.user) {
+      try {
+        await tenantService.initializeTenant({
+          name: company,
+          adminUserId: data.user.id,
+          adminEmail: email,
+          adminCompanyName: company
+        })
+      } catch (tenantError) {
+        console.error('Erreur lors de l\'initialisation du tenant:', tenantError)
+        // On ne throw pas l'erreur pour ne pas bloquer la création du compte
+      }
+    }
   }
 
   const signOut = async () => {

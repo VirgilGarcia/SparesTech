@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { categoryService } from '../../services/categoryService'
 import { useAuth } from '../../context/AuthContext'
 import { Navigate } from 'react-router-dom'
@@ -8,11 +7,12 @@ import { useMarketplaceTheme } from '../../context/ThemeContext'
 import { Modal } from '../../components/Modal'
 import { ConfirmDialog } from '../../components/ConfirmDialog'
 import type { Category, CategoryTree } from '../../services/categoryService'
+import React from 'react'
 
 function AdminCategories() {
   const { user, loading: authLoading } = useAuth()
   const { theme } = useMarketplaceTheme()
-  const [categories, setCategories] = useState<Category[]>([])
+  const [, setCategories] = useState<Category[]>([])
   const [categoryTree, setCategoryTree] = useState<CategoryTree[]>([])
   const [loading, setLoading] = useState(true)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -27,7 +27,6 @@ function AdminCategories() {
   const [searchQuery, setSearchQuery] = useState('')
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
   const [categoryToDelete, setCategoryToDelete] = useState<{id: number, name: string} | null>(null)
-  const [deleting, setDeleting] = useState(false)
   const [submitting, setSubmitting] = useState(false)
 
   useEffect(() => {
@@ -116,7 +115,7 @@ function AdminCategories() {
 
   const handleDelete = (id: number, name: string) => {
     // Vérifier si la catégorie a des sous-catégories
-    const category = categories.find(c => c.id === id)
+
     const hasChildren = categoryTree.some(c => c.id === id && c.children.length > 0) || 
                        categoryTree.some(c => c.children.some(child => child.id === id && child.children.length > 0))
     
@@ -132,7 +131,7 @@ function AdminCategories() {
     if (!categoryToDelete) return
 
     try {
-      setDeleting(true)
+      setSubmitting(true)
       await categoryService.deleteCategory(categoryToDelete.id)
       setSuccess('Catégorie supprimée avec succès !')
       loadCategories()
@@ -147,7 +146,7 @@ function AdminCategories() {
         setError(error.message || 'Erreur lors de la suppression de la catégorie')
       }
     } finally {
-      setDeleting(false)
+      setSubmitting(false)
       setCategoryToDelete(null)
     }
   }
@@ -180,7 +179,7 @@ function AdminCategories() {
     }))
   }
 
-  const renderCategoryTree = (categories: CategoryTree[], level: number = 0): JSX.Element[] => {
+  const renderCategoryTree = (categories: CategoryTree[], level: number = 0): React.ReactNode => {
     return categories.map(category => (
       <div key={category.id} className="category-item">
         <div 
@@ -233,7 +232,7 @@ function AdminCategories() {
           {/* Actions */}
           <div className="flex items-center space-x-2">
             <button
-              onClick={() => handleEdit(category)}
+              onClick={() => handleEdit(category as any)}
               className="px-4 py-2 text-blue-600 hover:text-blue-800 text-sm font-medium rounded-lg hover:bg-blue-50 transition-all duration-200 flex items-center gap-2"
             >
               <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -274,16 +273,16 @@ function AdminCategories() {
   }
 
   // Fonction récursive pour générer les options du select parent
-  const renderCategoryOptions = (tree: CategoryTree[], excludeIds: number[] = [], level = 0): JSX.Element[] => {
-    return tree.flatMap(category => {
-      if (excludeIds.includes(category.id)) return [];
+  const renderCategoryOptions = (tree: CategoryTree[], excludeIds: number[] = [], level = 0): React.ReactNode => {
+    return React.Children.toArray(tree.map(category => {
+      if (excludeIds.includes(category.id)) return null;
       return [
         <option key={category.id} value={category.id}>
           {'—'.repeat(level)} {category.name}
         </option>,
-        ...renderCategoryOptions(category.children, excludeIds, level + 1)
+        ...(renderCategoryOptions(category.children, excludeIds, level + 1) as any[])
       ];
-    });
+    }));
   };
 
   if (authLoading) {
@@ -302,7 +301,7 @@ function AdminCategories() {
         {/* Titre et actions */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Catégories</h1>
+            <h1 className="text-3xl font-light text-gray-900 mb-2">Catégories</h1>
             <p className="text-gray-600">Gérez la hiérarchie des catégories de votre marketplace</p>
           </div>
           <div className="flex flex-col sm:flex-row gap-4 w-full lg:w-auto">
@@ -319,10 +318,6 @@ function AdminCategories() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                style={{ 
-                  focusRingColor: theme.primaryColor,
-                  focusBorderColor: theme.primaryColor 
-                }}
               />
             </div>
             
@@ -410,10 +405,6 @@ function AdminCategories() {
                   className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                     validationErrors.name ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                   }`}
-                  style={!validationErrors.name ? { 
-                    focusRingColor: theme.primaryColor,
-                    focusBorderColor: theme.primaryColor 
-                  } : {}}
                   placeholder="Ex: Pièces moteur"
                   required
                 />
@@ -434,10 +425,6 @@ function AdminCategories() {
                     parent_id: e.target.value ? parseInt(e.target.value) : null 
                   }))}
                   className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                  style={{ 
-                    focusRingColor: theme.primaryColor,
-                    focusBorderColor: theme.primaryColor 
-                  }}
                 >
                   <option value="">Aucune (catégorie principale)</option>
                   {renderCategoryOptions(
@@ -465,10 +452,6 @@ function AdminCategories() {
                 className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                   validationErrors.description ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                 }`}
-                style={!validationErrors.description ? { 
-                  focusRingColor: theme.primaryColor,
-                  focusBorderColor: theme.primaryColor 
-                } : {}}
                 placeholder="Description de la catégorie..."
                 maxLength={500}
               />
@@ -575,12 +558,11 @@ function AdminCategories() {
           isOpen={categoryToDelete !== null}
           onCancel={() => setCategoryToDelete(null)}
           onConfirm={confirmDelete}
-          title="Supprimer la catégorie"
-          message={`Êtes-vous sûr de vouloir supprimer la catégorie "${categoryToDelete?.name}" ? Cette action est irréversible.`}
+          title="Supprimer la catégorie ?"
+          message="Cette action est irréversible. Voulez-vous vraiment supprimer cette catégorie ?"
           confirmText="Supprimer"
           cancelText="Annuler"
           type="danger"
-          loading={deleting}
         />
       </div>
     </div>

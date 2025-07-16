@@ -108,7 +108,7 @@ function AdminProducts() {
         // Filtres de catégorie
         categoryId: filters.category ? parseInt(filters.category) : undefined,
         // Tous les filtres sont maintenant côté serveur pour optimiser les performances
-        stockLevel: filters.stockLevel || undefined,
+        stockLevel: filters.stockLevel as 'in_stock' | 'low_stock' | 'out_of_stock' | undefined,
         visible: filters.visible ? filters.visible === 'visible' : undefined,
         vendable: filters.vendable ? filters.vendable === 'vendable' : undefined,
         priceMin: filters.priceMin ? parseFloat(filters.priceMin) : undefined,
@@ -166,16 +166,6 @@ function AdminProducts() {
 
   const handleFilterChange = (filterName: string, value: string) => {
     setFilters(prev => ({ ...prev, [filterName]: value }))
-    setCurrentPage(1)
-  }
-
-  const handleSortChange = (newSortBy: string) => {
-    if (newSortBy === sortBy) {
-      setSortOrder(prev => prev === 'asc' ? 'desc' : 'asc')
-    } else {
-      setSortBy(newSortBy)
-      setSortOrder('desc')
-    }
     setCurrentPage(1)
   }
 
@@ -274,7 +264,7 @@ function AdminProducts() {
         {/* Titre et actions */}
         <div className="flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6 mb-8">
           <div>
-            <h1 className="text-3xl font-bold text-gray-900 mb-2">Gestion des produits</h1>
+            <h1 className="text-3xl font-light text-gray-900 mb-2">Gestion des produits</h1>
             <p className="text-gray-600">
               {totalItems > 0 ? `${totalItems} produit${totalItems > 1 ? 's' : ''} au total` : 'Aucun produit trouvé'}
             </p>
@@ -351,10 +341,6 @@ function AdminProducts() {
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 className="w-full pl-10 pr-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                style={{ 
-                  focusRingColor: theme.primaryColor,
-                  focusBorderColor: theme.primaryColor 
-                }}
               />
             </div>
             <button
@@ -379,10 +365,6 @@ function AdminProducts() {
                     value={filters.category}
                     onChange={(e) => handleFilterChange('category', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all text-sm"
-                    style={{ 
-                      focusRingColor: theme.primaryColor,
-                      focusBorderColor: theme.primaryColor 
-                    }}
                   >
                     <option value="">Toutes les catégories</option>
                     {categories.map(category => (
@@ -402,10 +384,6 @@ function AdminProducts() {
                     value={filters.stockLevel}
                     onChange={(e) => handleFilterChange('stockLevel', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all text-sm"
-                    style={{ 
-                      focusRingColor: theme.primaryColor,
-                      focusBorderColor: theme.primaryColor 
-                    }}
                   >
                     <option value="">Tous les niveaux</option>
                     <option value="in_stock">En stock (&gt;10)</option>
@@ -423,10 +401,6 @@ function AdminProducts() {
                     value={filters.visible}
                     onChange={(e) => handleFilterChange('visible', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all text-sm"
-                    style={{ 
-                      focusRingColor: theme.primaryColor,
-                      focusBorderColor: theme.primaryColor 
-                    }}
                   >
                     <option value="">Tous les statuts</option>
                     <option value="visible">Visible</option>
@@ -443,10 +417,6 @@ function AdminProducts() {
                     value={filters.vendable}
                     onChange={(e) => handleFilterChange('vendable', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all text-sm"
-                    style={{ 
-                      focusRingColor: theme.primaryColor,
-                      focusBorderColor: theme.primaryColor 
-                    }}
                   >
                     <option value="">Tous les statuts</option>
                     <option value="vendable">Vendable</option>
@@ -465,10 +435,6 @@ function AdminProducts() {
                     value={filters.priceMin || ''}
                     onChange={(e) => handleFilterChange('priceMin', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all text-sm"
-                    style={{ 
-                      focusRingColor: theme.primaryColor,
-                      focusBorderColor: theme.primaryColor 
-                    }}
                     min="0"
                     step="0.01"
                   />
@@ -485,10 +451,6 @@ function AdminProducts() {
                     value={filters.priceMax || ''}
                     onChange={(e) => handleFilterChange('priceMax', e.target.value)}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all text-sm"
-                    style={{ 
-                      focusRingColor: theme.primaryColor,
-                      focusBorderColor: theme.primaryColor 
-                    }}
                     min="0"
                     step="0.01"
                   />
@@ -508,10 +470,6 @@ function AdminProducts() {
                       setCurrentPage(1)
                     }}
                     className="w-full px-3 py-2 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all text-sm"
-                    style={{ 
-                      focusRingColor: theme.primaryColor,
-                      focusBorderColor: theme.primaryColor 
-                    }}
                   >
                     <option value="name_asc">Nom (A-Z)</option>
                     <option value="name_desc">Nom (Z-A)</option>
@@ -643,7 +601,7 @@ function AdminProducts() {
                         </td>
                         <td className="px-6 py-6">
                           <div className="text-lg font-bold" style={{ color: theme.primaryColor }}>
-                            {parseFloat(product.prix).toFixed(2)}€
+                            {typeof product.prix === 'string' ? parseFloat(product.prix).toFixed(2) : product.prix?.toFixed(2)}€
                           </div>
                         </td>
                         <td className="px-6 py-6">
@@ -793,16 +751,13 @@ function AdminProducts() {
       {/* Dialogues */}
       <ConfirmDialog
         isOpen={showDeleteDialog}
-        title="Supprimer le produit"
-        message={`Êtes-vous sûr de vouloir supprimer le produit "${productToDelete?.name}" ? Cette action est irréversible.`}
+        onCancel={() => setShowDeleteDialog(false)}
+        onConfirm={confirmDelete}
+        title="Supprimer le produit ?"
+        message="Cette action est irréversible. Voulez-vous vraiment supprimer ce produit ?"
         confirmText="Supprimer"
         cancelText="Annuler"
         type="danger"
-        onConfirm={confirmDelete}
-        onCancel={() => {
-          setShowDeleteDialog(false)
-          setProductToDelete(null)
-        }}
       />
 
       <Toast

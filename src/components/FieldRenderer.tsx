@@ -1,21 +1,17 @@
 import React from 'react'
 
 interface FieldRendererProps {
-  fieldName: string
   fieldType: 'text' | 'number' | 'textarea' | 'date' | 'url'
   value: string
   displayName: string
   context: 'catalog' | 'product'
-  options?: string[]
 }
 
 const FieldRenderer: React.FC<FieldRendererProps> = ({
-  fieldName,
   fieldType,
   value,
   displayName,
   context,
-  options = []
 }) => {
   // Rendu pour le catalogue (design compact)
   if (context === 'catalog') {
@@ -23,7 +19,7 @@ const FieldRenderer: React.FC<FieldRendererProps> = ({
   }
 
   // Rendu pour la page produit (design complet)
-  return <ProductFieldRenderer fieldType={fieldType} value={value} displayName={displayName} options={options} />
+  return <ProductFieldRenderer fieldType={fieldType} value={value} displayName={displayName} />
 }
 
 // Composant pour l'affichage dans le catalogue
@@ -84,8 +80,7 @@ const ProductFieldRenderer: React.FC<{
   fieldType: string
   value: string
   displayName: string
-  options: string[]
-}> = ({ fieldType, value, displayName, options }) => {
+}> = ({ fieldType, value, displayName }) => {
   switch (fieldType) {
     case 'text':
       return (

@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Link, useSearchParams } from 'react-router-dom'
+import { useSearchParams } from 'react-router-dom'
 import Header from '../components/Header'
 import { useCart } from '../context/CartContext'
 import { useMarketplaceTheme } from '../context/ThemeContext'
@@ -13,16 +13,13 @@ import CategoryBreadcrumb from '../components/CategoryBreadcrumb'
 import { Pagination } from '../components/Pagination'
 import { useCache } from '../hooks/useCache'
 import { fieldUtils } from '../utils/fieldUtils'
-import { useMarketplaceSettings } from '../hooks/useMarketplaceSettings'
 import type { Product } from '../services/productService'
 import type { CategoryTree } from '../services/categoryService'
-import type { ProductFieldDisplay, ProductFieldValue } from '../services/productService'
 
 function Catalog() {
   const { addToCart } = useCart()
   const { display, theme } = useMarketplaceTheme()
   const { user } = useAuth()
-  const { settings } = useMarketplaceSettings()
   const [searchParams, setSearchParams] = useSearchParams()
   
   // États de pagination
@@ -35,7 +32,6 @@ function Catalog() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
-  const [selectedCategoryPath, setSelectedCategoryPath] = useState<string>('')
   const [userRole, setUserRole] = useState<string | null>(null)
   const [showSidebar, setShowSidebar] = useState(true)
   const [fieldValues, setFieldValues] = useState<{ [productId: string]: { [fieldName: string]: string } }>({})
@@ -53,22 +49,18 @@ function Catalog() {
     { ttl: 5 * 60 * 1000 } // 5 minutes
   )
 
-  // Mode d'affichage fixe : toujours afficher sous-catégories ET produits
-  const catalogDisplayMode = 'subcategories_with_products'
-
   // Charger tous les produits au démarrage et gérer les paramètres d'URL
   useEffect(() => {
     const categoryParam = searchParams.get('category')
     const pageParam = searchParams.get('page')
     const searchParam = searchParams.get('search')
     
-    let hasChanges = false
+
     
     if (categoryParam) {
       const categoryId = parseInt(categoryParam)
       if (!isNaN(categoryId) && categoryId !== selectedCategoryId) {
         setSelectedCategoryId(categoryId)
-        hasChanges = true
         // Trouver le chemin de la catégorie
         if (categoryTree) {
           const findCategoryPath = (categories: CategoryTree[], targetId: number): string | null => {
@@ -85,30 +77,25 @@ function Catalog() {
           }
           const path = findCategoryPath(categoryTree, categoryId)
           if (path) {
-            setSelectedCategoryPath(path)
+  
           }
         }
       }
     } else if (selectedCategoryId !== null) {
       setSelectedCategoryId(null)
-      setSelectedCategoryPath('')
-      hasChanges = true
     }
     
     if (pageParam) {
       const page = parseInt(pageParam)
       if (!isNaN(page) && page > 0 && page !== currentPage) {
         setCurrentPage(page)
-        hasChanges = true
       }
     } else if (currentPage !== 1) {
       setCurrentPage(1)
-      hasChanges = true
     }
     
     if (searchParam !== searchQuery) {
       setSearchQuery(searchParam || '')
-      hasChanges = true
     }
   }, [searchParams, categoryTree])
 
@@ -239,11 +226,10 @@ function Catalog() {
     setSearchParams(newParams)
   }
 
-  const handleCategorySelect = (categoryId: number, categoryPath: string) => {
+  const handleCategorySelect = (categoryId: number) => {
     // Cas spécial : retour à l'accueil (categoryId = -1)
     if (categoryId === -1) {
       setSelectedCategoryId(null)
-      setSelectedCategoryPath('')
       setCurrentPage(1)
       const newParams = new URLSearchParams()
       if (searchQuery) {
@@ -254,7 +240,6 @@ function Catalog() {
     }
     
     setSelectedCategoryId(categoryId)
-    setSelectedCategoryPath(categoryPath)
     setCurrentPage(1)
     // Mettre à jour les paramètres d'URL immédiatement, et toujours page=1
     const newParams = new URLSearchParams()
@@ -313,7 +298,6 @@ function Catalog() {
     })() : null
 
   // Déterminer ce qu'il faut afficher - logique simplifiée
-  const hasProducts = totalItems > 0
   const hasSubcategories = selectedCategory && selectedCategory.children.length > 0
   
   // Toujours afficher les sous-catégories ET les produits
@@ -350,10 +334,6 @@ function Catalog() {
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   className="flex-1 lg:w-80 px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-offset-0 transition-all"
-                  style={{ 
-                    focusRingColor: theme.primaryColor,
-                    focusBorderColor: theme.primaryColor 
-                  }}
                 />
                 <button
                   type="submit"
@@ -415,7 +395,7 @@ function Catalog() {
                     {selectedCategory.children.map((subCategory) => (
                       <div
                         key={subCategory.id}
-                        onClick={() => handleCategorySelect(subCategory.id, subCategory.path)}
+                        onClick={() => handleCategorySelect(subCategory.id)}
                         className="group bg-white rounded-2xl border border-gray-100 p-8 cursor-pointer hover:shadow-xl hover:border-gray-200 transition-all duration-300 transform hover:scale-105"
                       >
                         <div className="text-center">
@@ -449,7 +429,7 @@ function Catalog() {
                       key={product.id}
                       product={product}
                       fieldValues={fieldValues[product.id] || {}}
-                      fieldDisplay={fieldDisplay || {}}
+                      fieldDisplay={fieldDisplay || []}
                       onAddToCart={addToCart}
                       showPrices={display.showPrices}
                       showStock={display.showStock}
@@ -490,7 +470,6 @@ function Catalog() {
                   onClick={() => {
                     setSearchQuery('')
                     setSelectedCategoryId(null)
-                    setSelectedCategoryPath('')
                     setCurrentPage(1)
                     setSearchParams(new URLSearchParams())
                   }}

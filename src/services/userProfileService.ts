@@ -8,6 +8,7 @@ export interface UserProfile {
   address: string | null
   city: string | null
   postal_code: string | null
+  country: string | null
   role: string
   is_active: boolean
   tenant_id: string | null
@@ -62,6 +63,25 @@ export const userProfileService = {
         updated_at: new Date().toISOString()
       })
       .eq('id', userId)
+
+    if (error) throw error
+  },
+
+  // Alias pour getProfile (utilisé dans Profile.tsx)
+  async getProfile(userId: string): Promise<UserProfile | null> {
+    return this.getUserProfile(userId)
+  },
+
+  // Alias pour updateProfile (utilisé dans Profile.tsx)
+  async updateProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile> {
+    return this.updateUserProfile(userId, updates)
+  },
+
+  // Changer le mot de passe (utilisé dans Profile.tsx)
+  async changePassword(newPassword: string): Promise<void> {
+    const { error } = await supabase.auth.updateUser({
+      password: newPassword
+    })
 
     if (error) throw error
   }

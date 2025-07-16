@@ -4,7 +4,7 @@ import { useCart } from '../context/CartContext'
 import { useMarketplaceTheme } from '../context/ThemeContext'
 import { productService } from '../services/productService'
 import { productStructureService } from '../services/productStructureService'
-import { useAuth } from '../context/AuthContext'
+
 import Header from '../components/Header'
 import FieldRenderer from '../components/FieldRenderer'
 import CategoryBreadcrumb from '../components/CategoryBreadcrumb'
@@ -17,8 +17,8 @@ interface ProductFieldValueWithField extends ProductFieldValue {
 function ProductDetail() {
   const { id } = useParams<{ id: string }>()
   const { addToCart } = useCart()
-  const { display, theme } = useMarketplaceTheme()
-  const { user } = useAuth()
+  const { theme } = useMarketplaceTheme()
+
   const navigate = useNavigate()
   
   const [product, setProduct] = useState<Product | null>(null)
@@ -115,11 +115,6 @@ function ProductDetail() {
   }
 
   // Fonctions utilitaires pour vérifier l'affichage des champs
-  const shouldShowField = (fieldName: string): boolean => {
-    const field = fieldDisplay.find(f => f.field_name === fieldName)
-    return field ? field.show_in_product : false
-  }
-
   const getFieldValue = (fieldName: string): string | null => {
     if (fieldDisplay.find(f => f.field_name === fieldName)?.field_type === 'system') {
       return product?.[fieldName]?.toString() || null
@@ -210,12 +205,11 @@ function ProductDetail() {
         return (
           <FieldRenderer
             key={display.id}
-            fieldName={display.field_name}
-            fieldType={customField.type}
+            fieldType={customField.type as 'text' | 'number' | 'textarea' | 'date' | 'url'}
             value={value}
             displayName={getFieldDisplayName(display.field_name)}
             context="product"
-            options={customField.options || []}
+
           />
         )
       }
@@ -236,7 +230,7 @@ function ProductDetail() {
   const getImages = () => {
     if (!product) return []
     const images = [product.photo_url || '/default-product-image.svg']
-    // Ici on pourrait ajouter d'autres images si on avait un champ images supplémentaires
+
     return images
   }
 
@@ -267,7 +261,7 @@ function ProductDetail() {
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-2.5L13.732 4c-.77-.833-1.964-.833-2.732 0L3.732 16.5c-.77.833.192 2.5 1.732 2.5z" />
               </svg>
             </div>
-            <h2 className="text-2xl font-bold text-gray-900 mb-3">Produit non trouvé</h2>
+            <h2 className="text-3xl font-light text-gray-900 mb-2">Produit non trouvé</h2>
             <p className="text-gray-600 mb-8 max-w-md mx-auto">
               Le produit que vous recherchez n'existe pas ou n'est plus disponible
             </p>
@@ -313,7 +307,7 @@ function ProductDetail() {
               <span className="text-gray-900 font-semibold truncate">{product.name}</span>
             </div>
           ) : (
-            // Fallback si pas de catégorie
+        
             <div className="flex items-center space-x-3">
               <Link 
                 to="/catalog" 

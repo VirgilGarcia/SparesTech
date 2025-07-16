@@ -87,12 +87,12 @@ function Checkout() {
         customer_postal_code: formData.postalCode,
         notes: formData.notes,               
         items: cartItems.map(item => ({
-          product_id: item.id,
+          product_id: Number(item.id),
           product_name: item.name,
           product_reference: item.reference,
           quantity: item.quantity,
-          unit_price: item.price,
-          total_price: item.price * item.quantity
+          unit_price: item.prix,
+          total_price: item.prix * item.quantity
         }))
       })
 
@@ -146,11 +146,11 @@ function Checkout() {
     <div className="min-h-screen bg-gray-50">
       <Header />
       
-      <div className="max-w-6xl mx-auto px-6 py-8">
-        <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 mb-6">
+      <div className="max-w-6xl mx-auto px-6 lg:px-8 py-8">
+        <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:p-8 mb-6">
           <div className="flex items-center gap-3 mb-6">
             <CreditCard className="w-6 h-6 text-gray-600" />
-            <h1 className="text-2xl font-medium text-gray-900">Finaliser la commande</h1>
+            <h1 className="text-3xl font-light text-gray-900 mb-2">Finaliser la commande</h1>
           </div>
 
           {/* Étapes du checkout */}
@@ -178,7 +178,7 @@ function Checkout() {
           {/* Formulaire */}
           <div className="lg:col-span-2 space-y-6">
             {/* Informations personnelles */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <User className="w-5 h-5 text-gray-600" />
                 <h2 className="text-lg font-medium text-gray-900">Informations personnelles</h2>
@@ -211,7 +211,7 @@ function Checkout() {
                       name="company"
                       value={formData.company}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-sm"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-base"
                       placeholder="Nom de votre entreprise"
                       required
                     />
@@ -227,7 +227,7 @@ function Checkout() {
                       name="email"
                       value={formData.email}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-sm"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-base"
                       placeholder="votre@email.com"
                       required
                     />
@@ -244,7 +244,7 @@ function Checkout() {
                     name="phone"
                     value={formData.phone}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-sm"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-base"
                     placeholder="06 12 34 56 78"
                   />
                 </div>
@@ -252,7 +252,7 @@ function Checkout() {
             </div>
 
             {/* Adresse de livraison */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <MapPin className="w-5 h-5 text-gray-600" />
                 <h2 className="text-lg font-medium text-gray-900">Adresse de livraison</h2>
@@ -269,7 +269,7 @@ function Checkout() {
                     name="address"
                     value={formData.address}
                     onChange={handleChange}
-                    className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-sm"
+                    className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-base"
                     placeholder="123 rue de la Paix"
                     required
                   />
@@ -286,7 +286,7 @@ function Checkout() {
                       name="city"
                       value={formData.city}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-sm"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-base"
                       placeholder="Paris"
                       required
                     />
@@ -301,7 +301,7 @@ function Checkout() {
                       name="postalCode"
                       value={formData.postalCode}
                       onChange={handleChange}
-                      className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-sm"
+                      className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-base"
                       placeholder="75001"
                       required
                     />
@@ -311,7 +311,7 @@ function Checkout() {
             </div>
 
             {/* Notes */}
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:p-8">
               <div className="flex items-center gap-3 mb-6">
                 <FileText className="w-5 h-5 text-gray-600" />
                 <h2 className="text-lg font-medium text-gray-900">Notes de commande</h2>
@@ -327,7 +327,7 @@ function Checkout() {
                   value={formData.notes}
                   onChange={handleChange}
                   rows={4}
-                  className="w-full px-4 py-2.5 border border-gray-200 rounded-lg focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-sm"
+                  className="w-full px-4 py-3 border border-gray-200 rounded-xl focus:outline-none focus:border-gray-400 focus:ring-1 focus:ring-gray-400 text-base"
                   placeholder="Instructions de livraison, demandes spéciales..."
                 />
               </div>
@@ -336,23 +336,23 @@ function Checkout() {
 
           {/* Résumé commande */}
           <div className="lg:col-span-1">
-            <div className="bg-white rounded-lg shadow-sm border border-gray-100 p-6 sticky top-6">
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-100 p-6 lg:p-8 sticky top-6">
               <h2 className="text-lg font-medium text-gray-900 mb-6">Résumé de la commande</h2>
               
               {/* Articles */}
               <div className="space-y-3 mb-6 max-h-64 overflow-y-auto">
                 {cartItems.map(item => (
-                  <div key={item.id} className="flex justify-between items-center p-3 bg-gray-50 rounded-lg">
+                  <div key={item.id} className="flex justify-between items-center p-4 bg-gray-50 rounded-xl">
                     <div className="flex-1">
                       <div className="font-medium text-gray-900 text-sm">{item.name}</div>
                       <div className="text-xs text-gray-600">{item.reference}</div>
                     </div>
                     <div className="text-right">
                       <div className="font-medium text-gray-900 text-sm">
-                        {item.quantity} × {item.price}€
+                        {item.quantity} × {item.prix}€
                       </div>
                       <div className="text-xs text-gray-600">
-                        {(item.quantity * item.price).toFixed(2)}€
+                        {(item.quantity * item.prix).toFixed(2)}€
                       </div>
                     </div>
                   </div>
@@ -388,7 +388,7 @@ function Checkout() {
                 type="submit"
                 disabled={loading || profileLoading}
                 onClick={handleSubmit}
-                className={`w-full py-2.5 rounded-lg font-medium transition-colors text-sm ${
+                className={`w-full py-3 rounded-xl font-medium transition-colors text-base ${
                   loading || profileLoading
                     ? 'bg-gray-300 text-gray-500 cursor-not-allowed'
                     : 'text-white hover:opacity-90 shadow-sm'
@@ -399,7 +399,7 @@ function Checkout() {
               </button>
 
               {/* Informations sécurité */}
-              <div className="mt-6 p-4 bg-gray-50 rounded-lg">
+              <div className="mt-6 p-4 bg-gray-50 rounded-xl">
                 <div className="flex items-center gap-2 mb-2">
                   <Lock className="w-4 h-4 text-green-600" />
                   <span className="font-medium text-gray-900 text-sm">Commande sécurisée</span>

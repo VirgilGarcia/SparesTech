@@ -121,5 +121,10 @@ export const errorHandler = {
       code: supabaseError.code,
       details: context
     }
+  },
+
+  // Obtenir un message d'erreur simple pour l'utilisateur
+  getErrorMessage(error: any, context?: string): string {
+    return this.createUserError(error, context).message
   }
 } 

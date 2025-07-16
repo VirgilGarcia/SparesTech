@@ -27,6 +27,7 @@ import ProductStructure from './pages/admin/ProductStructure'
 import AdminUsers from './pages/admin/Users'
 import Profile from './pages/Profile'
 import Orders from './pages/Orders'
+import UserOrderDetail from './pages/OrderDetail'
 import './index.css'
 
 function App() {
@@ -160,6 +161,14 @@ function App() {
                 <PrivateRoute>
                   <RequireAuth>
                     <Orders />
+                  </RequireAuth>
+                </PrivateRoute>
+              } />
+
+              <Route path="/orders/:id" element={
+                <PrivateRoute>
+                  <RequireAuth>
+                    <UserOrderDetail />
                   </RequireAuth>
                 </PrivateRoute>
               } />

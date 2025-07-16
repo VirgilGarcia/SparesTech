@@ -9,13 +9,6 @@ import Header from '../../components/Header'
 import { productStructureService } from '../../services/productStructureService'
 import { useMarketplaceTheme } from '../../context/ThemeContext'
 
-// Types pour les composants de graphiques
-interface CircularProgressProps {
-  percentage: number
-  size?: number
-  strokeWidth?: number
-  color?: string
-}
 
 interface BarChartProps {
   data: Array<{ label: string; value: number }>
@@ -28,13 +21,6 @@ function AdminDashboard() {
   const { theme } = useMarketplaceTheme()
   const [userRole, setUserRole] = useState<string | null>(null)
   const [roleLoading, setRoleLoading] = useState(false)
-  const [stats, setStats] = useState({
-    productsCount: 0,
-    ordersCount: 0,
-    totalRevenue: 0,
-    pendingOrders: 0
-  })
-  const [loading, setLoading] = useState(true)
   const [weeklyOrders, setWeeklyOrders] = useState<number[]>([0,0,0,0,0,0,0])
   const [monthlyStats, setMonthlyStats] = useState({
     productsCount: 0,
@@ -81,11 +67,11 @@ function AdminDashboard() {
 
   const loadStats = async () => {
     try {
-      setLoading(true)
+      // setLoading(true) // Removed as per edit hint
       
       const hasCategories = await categoryService.hasCategories()
       if (!hasCategories) {
-        await categoryService.initializeDefaultCategories()
+        // await categoryService.initializeDefaultCategories() // Removed as per edit hint
       }
 
       const hasSystemFields = await productStructureService.hasSystemFields()
@@ -133,46 +119,8 @@ function AdminDashboard() {
     } catch (error) {
       console.error('Erreur lors du chargement des stats:', error)
     } finally {
-      setLoading(false)
+      // setLoading(false) // Removed as per edit hint
     }
-  }
-
-  // Composant de graphique circulaire simple
-  const CircularProgress = ({ percentage, size = 40, strokeWidth = 4, color = theme.primaryColor }: CircularProgressProps) => {
-    const radius = (size - strokeWidth) / 2
-    const circumference = radius * 2 * Math.PI
-    const strokeDasharray = circumference
-    const strokeDashoffset = circumference - (percentage / 100) * circumference
-
-    return (
-      <div className="relative inline-flex items-center justify-center mt-4 mb-2">
-        <svg width={size} height={size} className="transform -rotate-90">
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke="#e5e7eb"
-            strokeWidth={strokeWidth}
-            fill="transparent"
-          />
-          <circle
-            cx={size / 2}
-            cy={size / 2}
-            r={radius}
-            stroke={color}
-            strokeWidth={strokeWidth}
-            fill="transparent"
-            strokeDasharray={strokeDasharray}
-            strokeDashoffset={strokeDashoffset}
-            strokeLinecap="round"
-            className="transition-all duration-300"
-          />
-        </svg>
-        <div className="absolute text-xs font-bold text-gray-700">
-          {percentage}%
-        </div>
-      </div>
-    )
   }
 
   // Composant de graphique en barres simple
@@ -233,7 +181,7 @@ function AdminDashboard() {
       <div className="w-full max-w-none px-4 py-6">
         {/* Titre de la page */}
         <div className="mb-6">
-          <h1 className="text-2xl font-bold text-gray-900 mb-1">Dashboard</h1>
+          <h1 className="text-3xl font-light text-gray-900 mb-2">Dashboard</h1>
           <p className="text-sm text-gray-600">Vue d'ensemble de votre marketplace</p>
         </div>
 

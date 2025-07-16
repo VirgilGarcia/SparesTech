@@ -103,11 +103,11 @@ function Login() {
                 </div>
               )}
               {/* Nom de l'entreprise */}
-              <h1 className="text-2xl font-light text-gray-900 mb-2">
+              <h1 className="text-3xl font-light text-gray-900 mb-2">
                 {settings?.company_name || 'Marketplace'}
               </h1>
             </div>
-            <h2 className="text-xl font-medium text-gray-900">Connexion</h2>
+            <h2 className="text-3xl font-light text-gray-900 mb-2">Connexion</h2>
             <p className="mt-2 text-gray-600">
               Connectez-vous à votre compte
             </p>
@@ -143,10 +143,6 @@ function Login() {
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-offset-0 transition-all"
-                style={{
-                  focusRingColor: theme.primaryColor,
-                  focusBorderColor: theme.primaryColor
-                }}
                 placeholder="votre@email.com"
                 disabled={loading}
               />
@@ -162,10 +158,6 @@ function Login() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-offset-0 transition-all"
-                style={{
-                  focusRingColor: theme.primaryColor,
-                  focusBorderColor: theme.primaryColor
-                }}
                 placeholder="••••••••"
                 disabled={loading}
               />

@@ -4,7 +4,6 @@ import { productService } from '../../services/productService'
 import { productStructureService } from '../../services/productStructureService'
 import { categoryService } from '../../services/categoryService'
 import { useAuth } from '../../context/AuthContext'
-import { useMarketplaceSettings } from '../../hooks/useMarketplaceSettings'
 import { useMarketplaceTheme } from '../../context/ThemeContext'
 import { Navigate } from 'react-router-dom'
 import Header from '../../components/Header'
@@ -17,7 +16,6 @@ function EditProduct() {
   const { theme } = useMarketplaceTheme()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
-  const { settings, loading: settingsLoading } = useMarketplaceSettings()
   const [userRole, setUserRole] = useState<string | null>(null)
   const [roleLoading, setRoleLoading] = useState(false)
   
@@ -35,7 +33,6 @@ function EditProduct() {
   // État pour les champs personnalisés
   const [customFields, setCustomFields] = useState<Record<string, string>>({})
   
-  const [loading, setLoading] = useState(false)
   const [loadingProduct, setLoadingProduct] = useState(true)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
@@ -196,7 +193,7 @@ function EditProduct() {
         category_ids: formData.category_ids,
         visible: formData.visible,
         vendable: formData.vendable,
-        custom_field_values: customFieldValues
+        custom_field_values: customFieldValues.filter((item): item is { field_id: string; value: string } => item !== null)
       })
       
       setSuccess('Produit modifié avec succès !')
@@ -211,7 +208,7 @@ function EditProduct() {
   }
 
   // Chargements et accès
-  if (authLoading || settingsLoading) {
+  if (authLoading || roleLoading) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -310,7 +307,7 @@ function EditProduct() {
               </svg>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Modifier le produit</h1>
+              <h1 className="text-3xl font-light text-gray-900 mb-2">Modifier le produit</h1>
               <p className="text-gray-600">Modifiez les informations de ce produit</p>
             </div>
           </div>
@@ -379,10 +376,7 @@ function EditProduct() {
                       className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                         validationErrors.name ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                       }`}
-                      style={!validationErrors.name ? { 
-                        focusRingColor: theme.primaryColor,
-                        focusBorderColor: theme.primaryColor 
-                      } : {}}
+                      style={!validationErrors.name ? {} : {}}
                       placeholder="Ex: Roulement à billes 6200"
                       required
                     />
@@ -404,10 +398,7 @@ function EditProduct() {
                       className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                         validationErrors.reference ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                       }`}
-                      style={!validationErrors.reference ? { 
-                        focusRingColor: theme.primaryColor,
-                        focusBorderColor: theme.primaryColor 
-                      } : {}}
+                      style={!validationErrors.reference ? {} : {}}
                       placeholder="Ex: REF-6200-001"
                       required
                     />
@@ -429,10 +420,7 @@ function EditProduct() {
                       className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                         validationErrors.prix ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                       }`}
-                      style={!validationErrors.prix ? { 
-                        focusRingColor: theme.primaryColor,
-                        focusBorderColor: theme.primaryColor 
-                      } : {}}
+                      style={!validationErrors.prix ? {} : {}}
                       placeholder="0.00"
                       step="0.01"
                       min="0"
@@ -456,10 +444,7 @@ function EditProduct() {
                       className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                         validationErrors.stock ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                       }`}
-                      style={!validationErrors.stock ? { 
-                        focusRingColor: theme.primaryColor,
-                        focusBorderColor: theme.primaryColor 
-                      } : {}}
+                      style={!validationErrors.stock ? {} : {}}
                       placeholder="0"
                       min="0"
                       required
@@ -481,8 +466,7 @@ function EditProduct() {
                       onChange={handleChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
                       style={{ 
-                        focusRingColor: theme.primaryColor,
-                        focusBorderColor: theme.primaryColor 
+ 
                       }}
                       placeholder="https://exemple.com/image.jpg"
                     />

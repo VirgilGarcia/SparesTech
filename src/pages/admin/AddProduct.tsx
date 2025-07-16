@@ -33,7 +33,6 @@ function AddProduct() {
   // État pour les champs personnalisés
   const [customFields, setCustomFields] = useState<Record<string, string>>({})
   
-  const [loading, setLoading] = useState(false)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({}) 
@@ -51,7 +50,7 @@ function AddProduct() {
     if (settings) {
       setFormData(prev => ({
         ...prev,
-        visible: settings.default_product_visibility,
+        visible: true,
         vendable: true
       }))
     }
@@ -259,7 +258,7 @@ function AddProduct() {
               </svg>
             </div>
             <div>
-              <h1 className="text-3xl font-bold text-gray-900 mb-2">Ajouter un produit</h1>
+              <h1 className="text-3xl font-light text-gray-900 mb-2">Ajouter un produit</h1>
               <p className="text-gray-600">Créez un nouveau produit pour votre catalogue</p>
             </div>
           </div>
@@ -328,10 +327,7 @@ function AddProduct() {
                       className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                         validationErrors.name ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                       }`}
-                      style={!validationErrors.name ? { 
-                        focusRingColor: theme.primaryColor,
-                        focusBorderColor: theme.primaryColor 
-                      } : {}}
+                      style={!validationErrors.name ? {} : {}}
                       placeholder="Ex: Roulement à billes 6200"
                       required
                     />
@@ -353,10 +349,7 @@ function AddProduct() {
                       className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                         validationErrors.reference ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                       }`}
-                      style={!validationErrors.reference ? { 
-                        focusRingColor: theme.primaryColor,
-                        focusBorderColor: theme.primaryColor 
-                      } : {}}
+                      style={!validationErrors.reference ? {} : {}}
                       placeholder="Ex: REF-6200-001"
                       required
                     />
@@ -378,10 +371,7 @@ function AddProduct() {
                       className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                         validationErrors.prix ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                       }`}
-                      style={!validationErrors.prix ? { 
-                        focusRingColor: theme.primaryColor,
-                        focusBorderColor: theme.primaryColor 
-                      } : {}}
+                      style={!validationErrors.prix ? {} : {}}
                       placeholder="0.00"
                       step="0.01"
                       min="0"
@@ -405,10 +395,7 @@ function AddProduct() {
                       className={`w-full px-4 py-3 border rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all ${
                         validationErrors.stock ? 'border-red-300 focus:border-red-500 focus:ring-red-500' : 'border-gray-300'
                       }`}
-                      style={!validationErrors.stock ? { 
-                        focusRingColor: theme.primaryColor,
-                        focusBorderColor: theme.primaryColor 
-                      } : {}}
+                      style={!validationErrors.stock ? {} : {}}
                       placeholder="0"
                       min="0"
                       required
@@ -429,10 +416,6 @@ function AddProduct() {
                       value={formData.photo_url}
                       onChange={handleChange}
                       className="w-full px-4 py-3 border border-gray-300 rounded-xl focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                      style={{ 
-                        focusRingColor: theme.primaryColor,
-                        focusBorderColor: theme.primaryColor 
-                      }}
                       placeholder="https://exemple.com/image.jpg"
                     />
                   </div>

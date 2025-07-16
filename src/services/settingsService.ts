@@ -1,4 +1,4 @@
-// Ajout à votre settingsService.ts existant
+
 
 import { supabase } from '../lib/supabase'
 
@@ -110,7 +110,7 @@ export const settingsService = {
     }
   },
 
-  // NOUVELLE MÉTHODE: Vérifier si le marketplace est configuré
+  
   isConfigured: async (): Promise<boolean> => {
     try {
       const { data, error } = await supabase

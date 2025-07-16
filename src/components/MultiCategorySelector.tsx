@@ -1,6 +1,5 @@
 import { useState, useEffect } from 'react'
 import { categoryService, type CategoryTree } from '../services/categoryService'
-import { useMarketplaceTheme } from '../context/ThemeContext'
 
 interface MultiCategorySelectorProps {
   value?: number[]
@@ -17,7 +16,6 @@ function MultiCategorySelector({
   className = "",
   required = false
 }: MultiCategorySelectorProps) {
-  const { theme } = useMarketplaceTheme()
   const [categoryTree, setCategoryTree] = useState<CategoryTree[]>([])
   const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
@@ -94,7 +92,7 @@ function MultiCategorySelector({
     })
   }
 
-  const renderCategoryOption = (category: CategoryTree, level: number = 0): JSX.Element => {
+  const renderCategoryOption = (category: CategoryTree, level: number = 0): React.ReactNode => {
     const isSelected = value?.includes(category.id) || false
     const isExpanded = expanded.has(category.id)
     const hasChildren = category.children.length > 0

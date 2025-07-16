@@ -66,7 +66,7 @@ function CategorySelector({
     setIsOpen(false)
   }
 
-  const renderCategoryOption = (category: CategoryTree, level: number = 0): JSX.Element => {
+  const renderCategoryOption = (category: CategoryTree, level: number = 0): React.ReactNode => {
     return (
       <div key={category.id}>
         <button

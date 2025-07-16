@@ -1,7 +1,6 @@
 import { useState, useEffect, useRef } from 'react'
 import { Link } from 'react-router-dom'
 import { categoryService, type CategoryTree } from '../services/categoryService'
-import { useMarketplaceTheme } from '../context/ThemeContext'
 
 interface CategoryMenuProps {
   className?: string
@@ -9,7 +8,6 @@ interface CategoryMenuProps {
 }
 
 function CategoryMenu({ className = '', maxLevels = 2 }: CategoryMenuProps) {
-  const { theme } = useMarketplaceTheme()
   const [categoryTree, setCategoryTree] = useState<CategoryTree[]>([])
   const [loading, setLoading] = useState(true)
   const [isOpen, setIsOpen] = useState(false)
@@ -43,7 +41,7 @@ function CategoryMenu({ className = '', maxLevels = 2 }: CategoryMenuProps) {
     }
   }
 
-  const renderCategoryItem = (category: CategoryTree, level: number = 0): JSX.Element => {
+  const renderCategoryItem = (category: CategoryTree, level: number = 0): React.ReactNode => {
     const hasChildren = category.children.length > 0 && level < maxLevels - 1
     const isHovered = hoveredCategory === category.id
 

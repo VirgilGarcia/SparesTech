@@ -17,7 +17,6 @@ export function useTheme() {
     initialized: false
   })
   const cacheRef = useRef<Map<string, { data: MarketplaceSettings; timestamp: number }>>(new Map())
-  const cacheKey = 'theme-settings'
 
   // Vérifier le cache local storage au démarrage
   useEffect(() => {

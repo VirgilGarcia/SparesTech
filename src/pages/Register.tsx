@@ -55,7 +55,7 @@ function Register() {
         <div className="max-w-md mx-auto px-6 py-12">
           <div className="bg-white rounded-2xl shadow-sm border border-stone-200 p-8 text-center">
             <div className="text-green-600 text-6xl mb-4">✅</div>
-            <h1 className="text-2xl font-bold text-stone-800 mb-2">Inscription réussie !</h1>
+            <h1 className="text-3xl font-light text-stone-800 mb-2">Inscription réussie !</h1>
             <p className="text-stone-600">Vérifiez votre email pour confirmer votre compte.</p>
           </div>
         </div>
@@ -78,7 +78,7 @@ function Register() {
                 style={{ maxWidth: 120 }}
               />
             )}
-            <h1 className="text-3xl font-bold mb-1" style={{ color: theme.primaryColor }}>{theme.companyName}</h1>
+            <h1 className="text-3xl font-light mb-2" style={{ color: theme.primaryColor }}>{theme.companyName}</h1>
             <div className="text-stone-600 mb-2">Créez votre compte professionnel</div>
           </div>
 

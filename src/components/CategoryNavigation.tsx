@@ -1,5 +1,3 @@
-import { useState, useEffect } from 'react'
-import { ChevronRightIcon } from '@heroicons/react/20/solid'
 import type { CategoryTree } from '../services/categoryService'
 
 interface CategoryNavigationProps {
@@ -15,24 +13,9 @@ function CategoryNavigation({
   categoryTree,
   onCategorySelect, 
   showProductCounts = false,
-  maxLevels = 10,
   className = '',
   selectedCategoryId
 }: CategoryNavigationProps) {
-  const [expandedCategories, setExpandedCategories] = useState<Set<number>>(new Set())
-
-  const toggleCategory = (categoryId: number, e: React.MouseEvent) => {
-    e.stopPropagation()
-    setExpandedCategories(prev => {
-      const newSet = new Set(prev)
-      if (newSet.has(categoryId)) {
-        newSet.delete(categoryId)
-      } else {
-        newSet.add(categoryId)
-      }
-      return newSet
-    })
-  }
 
   const handleCategoryClick = (category: CategoryTree) => {
     if (onCategorySelect) {
@@ -40,7 +23,7 @@ function CategoryNavigation({
     }
   }
 
-  const renderCategory = (category: CategoryTree, level: number = 0): JSX.Element => {
+  const renderCategory = (category: CategoryTree, level: number = 0): React.ReactNode => {
     const isSelected = selectedCategoryId === category.id
     
     // Afficher seulement les catégories de niveau 0 (racines)

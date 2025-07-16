@@ -1,7 +1,8 @@
 import { supabase } from '../lib/supabase'
 import { categoryService } from './categoryService'
+import { tenantService } from './tenantService'
 
-// Types pour la nouvelle structure
+
 export interface Product {
   id: string
   reference: string
@@ -11,6 +12,7 @@ export interface Product {
   visible: boolean
   vendable: boolean
   photo_url?: string
+  tenant_id?: string
   created_at: string
   updated_at: string
   product_categories?: {
@@ -33,7 +35,9 @@ export interface ProductField {
   required: boolean
   options?: string[]
   default_value?: string
+  tenant_id?: string
   created_at: string
+  active?: boolean
 }
 
 export interface ProductFieldDisplay {
@@ -64,10 +68,10 @@ export interface PaginationParams {
   limit: number
   search?: string
   categoryId?: number
-  categoryIds?: number[] // Nouveau paramètre pour filtrer par plusieurs catégories
+      categoryIds?: number[]
   sortBy?: string
   sortOrder?: 'asc' | 'desc'
-  // Nouveaux filtres pour optimisation serveur
+  
   stockLevel?: 'in_stock' | 'low_stock' | 'out_of_stock'
   visible?: boolean
   vendable?: boolean
@@ -85,9 +89,18 @@ export interface PaginatedResponse<T> {
   hasPrev: boolean
 }
 
+// Fonction utilitaire pour obtenir le tenant de l'utilisateur courant
+async function getCurrentTenantId(): Promise<string | null> {
+  const { data: { user } } = await supabase.auth.getUser()
+  if (!user) return null
+  
+  const tenant = await tenantService.getUserTenant(user.id)
+  return tenant?.id || null
+}
+
 export const productService = {
-  // Méthode pour les admins - retourne TOUS les produits avec pagination optimisée
-  async getAllProductsPaginated(params: PaginationParams): Promise<PaginatedResponse<Product>> {
+
+  async getAllProductsPaginated(params: PaginationParams, tenantId?: string): Promise<PaginatedResponse<Product>> {
     const { 
       page, 
       limit, 
@@ -104,7 +117,13 @@ export const productService = {
     } = params
     const offset = (page - 1) * limit
 
-    // Si on filtre par catégorie, on doit d'abord obtenir les product_ids
+    // Récupérer le tenant ID si non fourni
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
+
     let productIds: string[] | undefined
     if (categoryIds && categoryIds.length > 0) {
       const { data: productCategoryData, error: pcError } = await supabase
@@ -127,6 +146,7 @@ export const productService = {
     let query = supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))', { count: 'exact' })
+      .eq('tenant_id', currentTenantId)
 
     // Filtres de recherche
     if (search) {
@@ -166,7 +186,8 @@ export const productService = {
           query = query.gt('stock', 10)
           break
         case 'low_stock':
-          query = query.and('stock.gt.0,stock.lte.10')
+          // query = query.and('stock.gt.0,stock.lte.10')
+          query = query.gt('stock', 0).lte('stock', 10)
           break
         case 'out_of_stock':
           query = query.eq('stock', 0)
@@ -203,8 +224,8 @@ export const productService = {
     }
   },
 
-  // Méthode pour le catalogue public - retourne seulement les produits visibles avec pagination OPTIMISÉE
-  async getVisibleProductsPaginated(params: PaginationParams): Promise<PaginatedResponse<Product>> {
+
+  async getVisibleProductsPaginated(params: PaginationParams, tenantId?: string): Promise<PaginatedResponse<Product>> {
     const { 
       page, 
       limit, 
@@ -219,7 +240,13 @@ export const productService = {
     } = params
     const offset = (page - 1) * limit
 
-    // Si on a des categoryIds, on doit d'abord obtenir les product_ids correspondants
+    // Récupérer le tenant ID si non fourni
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
+
     let productIds: string[] | undefined
     if (categoryIds && categoryIds.length > 0) {
       console.log('🔍 Service: Recherche des produits pour les catégories:', categoryIds)
@@ -252,6 +279,7 @@ export const productService = {
     let query = supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))', { count: 'exact' })
+      .eq('tenant_id', currentTenantId)
       .eq('visible', true)
 
     // Filtres de recherche
@@ -274,7 +302,7 @@ export const productService = {
           query = query.gt('stock', 10)
           break
         case 'low_stock':
-          query = query.and('stock.gt.0,stock.lte.10')
+          query = query.gt('stock', 0).lte('stock', 10)
           break
         case 'out_of_stock':
           query = query.eq('stock', 0)
@@ -319,8 +347,8 @@ export const productService = {
     }
   },
 
-  // Nouvelle méthode pour obtenir les produits par catégorie avec sous-catégories
-  async getVisibleProductsByCategoryWithSubcategories(categoryId: number, params: Omit<PaginationParams, 'categoryId' | 'categoryIds'>): Promise<PaginatedResponse<Product>> {
+
+  async getVisibleProductsByCategoryWithSubcategories(categoryId: number, params: Omit<PaginationParams, 'categoryId' | 'categoryIds'>, tenantId?: string): Promise<PaginatedResponse<Product>> {
     // Obtenir l'arbre des catégories
     const categoryTree = await categoryService.getCategoryTree()
     
@@ -357,24 +385,36 @@ export const productService = {
     return this.getVisibleProductsPaginated({
       ...params,
       categoryIds
-    })
+    }, tenantId)
   },
 
   // Méthodes existantes pour compatibilité (à déprécier progressivement)
-  async getAllProducts(): Promise<Product[]> {
+  async getAllProducts(tenantId?: string): Promise<Product[]> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { data, error } = await supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
+      .eq('tenant_id', currentTenantId)
       .order('created_at', { ascending: false })
 
     if (error) throw error
     return data || []
   },
 
-  async getVisibleProducts(): Promise<Product[]> {
+  async getVisibleProducts(tenantId?: string): Promise<Product[]> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { data, error } = await supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
+      .eq('tenant_id', currentTenantId)
       .eq('visible', true)
       .order('created_at', { ascending: false })
 
@@ -382,11 +422,17 @@ export const productService = {
     return data || []
   },
 
-  async getProductById(id: string): Promise<Product | null> {
+  async getProductById(id: string, tenantId?: string): Promise<Product | null> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { data, error } = await supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
       .eq('id', id)
+      .eq('tenant_id', currentTenantId)
       .single()
 
     if (error) {
@@ -405,12 +451,20 @@ export const productService = {
     visible: boolean
     vendable: boolean
     category_ids?: number[]
-  }): Promise<Product> {
+  }, tenantId?: string): Promise<Product> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { category_ids, ...productFields } = productData
 
     const { data: product, error: productError } = await supabase
       .from('products')
-      .insert([productFields])
+      .insert([{
+        ...productFields,
+        tenant_id: currentTenantId
+      }])
       .select()
       .single()
 
@@ -442,13 +496,19 @@ export const productService = {
     vendable?: boolean
     category_ids?: number[]
     custom_field_values?: { field_id: string; value: string }[]
-  }): Promise<Product> {
+  }, tenantId?: string): Promise<Product> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { category_ids, custom_field_values, ...productUpdates } = updates
 
     const { data: product, error: productError } = await supabase
       .from('products')
       .update(productUpdates)
       .eq('id', id)
+      .eq('tenant_id', currentTenantId)
       .select()
       .single()
 
@@ -465,11 +525,17 @@ export const productService = {
     return product
   },
 
-  async deleteProduct(id: string): Promise<void> {
+  async deleteProduct(id: string, tenantId?: string): Promise<void> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { error } = await supabase
       .from('products')
       .delete()
       .eq('id', id)
+      .eq('tenant_id', currentTenantId)
 
     if (error) throw error
   },
@@ -554,10 +620,16 @@ export const productService = {
     }
   },
 
-  async searchProducts(query: string, categoryId?: number): Promise<Product[]> {
+  async searchProducts(query: string, categoryId?: number, tenantId?: string): Promise<Product[]> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     let supabaseQuery = supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
+      .eq('tenant_id', currentTenantId)
       .eq('visible', true)
       .or(`name.ilike.%${query}%,reference.ilike.%${query}%`)
 
@@ -571,10 +643,16 @@ export const productService = {
     return data || []
   },
 
-  async getProductsByCategory(categoryId: number): Promise<Product[]> {
+  async getProductsByCategory(categoryId: number, tenantId?: string): Promise<Product[]> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    if (!currentTenantId) {
+      throw new Error('Tenant non trouvé')
+    }
+
     const { data, error } = await supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
+      .eq('tenant_id', currentTenantId)
       .eq('visible', true)
       .eq('product_categories.category_id', categoryId)
       .order('name', { ascending: true })

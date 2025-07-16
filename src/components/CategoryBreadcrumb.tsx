@@ -1,5 +1,4 @@
 import { useState, useEffect } from 'react'
-import { Link } from 'react-router-dom'
 import { categoryService, type Category } from '../services/categoryService'
 import { useMarketplaceTheme } from '../context/ThemeContext'
 
