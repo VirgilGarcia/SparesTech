@@ -1,17 +1,7 @@
 import { supabase } from '../../lib/supabase'
 import { startupCustomerService } from './customerService'
 import { startupSubscriptionService } from './subscriptionService'
-
-export interface MarketplaceCreationRequest {
-  customer_id: string
-  company_name: string
-  subdomain: string
-  custom_domain?: string
-  plan_id: string
-  billing_cycle: 'monthly' | 'yearly'
-  public_access?: boolean
-  primary_color?: string
-}
+import type { MarketplaceCreationRequest as SharedMarketplaceCreationRequest } from '../../shared/types/marketplace'
 
 export interface MarketplaceCreationResult {
   success: boolean
@@ -36,13 +26,99 @@ export const startupMarketplaceService = {
   }) => {
     return await startupCustomerService.createCustomer(customerData)
   },
+
+  /**
+   * Créer un prospect
+   */
+  createProspect: async (prospectData: {
+    email: string
+    first_name: string
+    last_name: string
+    company_name: string
+    phone?: string
+    desired_subdomain?: string
+    selected_plan_id?: string
+  }): Promise<{ id: string } | null> => {
+    try {
+      const { data, error } = await supabase
+        .from('marketplace_prospects')
+        .insert([{
+          email: prospectData.email,
+          first_name: prospectData.first_name,
+          last_name: prospectData.last_name,
+          company_name: prospectData.company_name,
+          phone: prospectData.phone,
+          desired_subdomain: prospectData.desired_subdomain,
+          selected_plan_id: prospectData.selected_plan_id && prospectData.selected_plan_id.length > 10 ? prospectData.selected_plan_id : null,
+          status: 'prospect'
+        }])
+        .select('id')
+        .single()
+
+      if (error) throw error
+      return data
+    } catch (error) {
+      console.error('Erreur lors de la création du prospect:', error)
+      return null
+    }
+  },
+
+  /**
+   * Traiter le paiement et créer le marketplace
+   */
+  processPaymentAndCreateMarketplace: async (requestData: {
+    prospectId?: string
+    company_name: string
+    admin_first_name: string
+    admin_last_name: string
+    admin_email: string
+    admin_password: string
+    subdomain: string
+    custom_domain?: string
+    public_access: boolean
+    primary_color?: string
+    plan_id: string
+    billing_cycle: 'monthly' | 'yearly'
+    payment_data: Record<string, unknown>
+  }): Promise<{ url?: string; company_name?: string; admin_email?: string } | null> => {
+    try {
+      // Simuler le traitement du paiement
+      
+      
+      // Créer le marketplace (simulation)
+      const marketplace = await startupMarketplaceService.createMarketplace({
+        company_name: requestData.company_name,
+        admin_first_name: requestData.admin_first_name,
+        admin_last_name: requestData.admin_last_name,
+        admin_email: requestData.admin_email,
+        admin_password: requestData.admin_password,
+        subdomain: requestData.subdomain,
+        custom_domain: requestData.custom_domain,
+        public_access: requestData.public_access,
+        primary_color: requestData.primary_color
+      })
+
+      if (marketplace?.success && marketplace.marketplace_url) {
+        return {
+          url: marketplace.marketplace_url,
+          company_name: requestData.company_name,
+          admin_email: requestData.admin_email
+        }
+      }
+      
+      return null
+    } catch (error) {
+      console.error('Erreur lors du traitement du paiement:', error)
+      return null
+    }
+  },
   
   /**
    * Vérifie la disponibilité d'un sous-domaine
    */
   checkSubdomainAvailability: async (subdomain: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('public.tenants')
         .select('id')
         .eq('subdomain', subdomain.toLowerCase())
@@ -68,7 +144,7 @@ export const startupMarketplaceService = {
    */
   checkCustomDomainAvailability: async (domain: string): Promise<boolean> => {
     try {
-      const { data, error } = await supabase
+      const { error } = await supabase
         .from('public.tenants')
         .select('id')
         .eq('custom_domain', domain.toLowerCase())
@@ -128,27 +204,9 @@ export const startupMarketplaceService = {
   /**
    * Crée un marketplace complet pour un client
    */
-  createMarketplace: async (request: MarketplaceCreationRequest): Promise<MarketplaceCreationResult> => {
+  createMarketplace: async (request: SharedMarketplaceCreationRequest): Promise<MarketplaceCreationResult> => {
     try {
-      // 1. Vérifier le client
-      const customer = await startupCustomerService.getCustomerById(request.customer_id)
-      if (!customer) {
-        return {
-          success: false,
-          error: 'Client non trouvé'
-        }
-      }
-
-      // 2. Vérifier le plan
-      const plan = await startupSubscriptionService.getPlanById(request.plan_id)
-      if (!plan) {
-        return {
-          success: false,
-          error: 'Plan non trouvé'
-        }
-      }
-
-      // 3. Vérifier la disponibilité du sous-domaine
+      // 1. Vérifier la disponibilité du sous-domaine
       const isSubdomainAvailable = await startupMarketplaceService.checkSubdomainAvailability(request.subdomain)
       if (!isSubdomainAvailable) {
         return {
@@ -157,7 +215,7 @@ export const startupMarketplaceService = {
         }
       }
 
-      // 4. Vérifier la disponibilité du domaine personnalisé
+      // 2. Vérifier la disponibilité du domaine personnalisé
       if (request.custom_domain) {
         const isDomainAvailable = await startupMarketplaceService.checkCustomDomainAvailability(request.custom_domain)
         if (!isDomainAvailable) {
@@ -168,7 +226,7 @@ export const startupMarketplaceService = {
         }
       }
 
-      // 5. Créer le tenant
+      // 3. Créer le tenant
       const { data: tenant, error: tenantError } = await supabase
         .from('public.tenants')
         .insert([{
@@ -184,24 +242,7 @@ export const startupMarketplaceService = {
         throw new Error(`Erreur lors de la création du tenant: ${tenantError.message}`)
       }
 
-      // 6. Créer l'abonnement
-      const subscription = await startupSubscriptionService.createSubscription({
-        customer_id: request.customer_id,
-        plan_id: request.plan_id,
-        tenant_id: tenant.id,
-        billing_cycle: request.billing_cycle
-      })
-
-      if (!subscription) {
-        // Nettoyer le tenant créé
-        await supabase.from('public.tenants').delete().eq('id', tenant.id)
-        return {
-          success: false,
-          error: 'Erreur lors de la création de l\'abonnement'
-        }
-      }
-
-      // 7. Créer les paramètres du marketplace
+      // 4. Créer les paramètres du marketplace
       const { error: settingsError } = await supabase
         .from('public.marketplace_settings')
         .insert([{
@@ -216,7 +257,6 @@ export const startupMarketplaceService = {
 
       if (settingsError) {
         // Nettoyer les données créées
-        await supabase.from('startup.subscriptions').delete().eq('id', subscription.id)
         await supabase.from('public.tenants').delete().eq('id', tenant.id)
         return {
           success: false,
@@ -224,64 +264,18 @@ export const startupMarketplaceService = {
         }
       }
 
-      // 8. Créer les catégories par défaut
-      const defaultCategories = [
-        { name: 'Général', description: 'Catégorie générale', order_index: 0 },
-        { name: 'Pièces détachées', description: 'Pièces de rechange', order_index: 1 },
-        { name: 'Consommables', description: 'Produits consommables', order_index: 2 }
-      ]
-
-      const { error: categoriesError } = await supabase
-        .from('public.categories')
-        .insert(defaultCategories.map(cat => ({
-          ...cat,
-          tenant_id: tenant.id,
-          is_active: true,
-          level: 0
-        })))
-
-      if (categoriesError) {
-        console.warn('Erreur lors de la création des catégories:', categoriesError)
-        // On continue même si les catégories échouent
-      }
-
-      // 9. Créer la structure de champs produits par défaut
-      const defaultFields = [
-        { field_name: 'reference', display_name: 'Référence', catalog_order: 1, product_order: 1 },
-        { field_name: 'name', display_name: 'Nom', catalog_order: 2, product_order: 2 },
-        { field_name: 'prix', display_name: 'Prix', catalog_order: 3, product_order: 3 },
-        { field_name: 'stock', display_name: 'Stock', catalog_order: 4, product_order: 4 }
-      ]
-
-      const { error: fieldsError } = await supabase
-        .from('public.product_field_display')
-        .insert(defaultFields.map(field => ({
-          ...field,
-          tenant_id: tenant.id,
-          field_type: 'system',
-          show_in_catalog: true,
-          show_in_product: true,
-          active: true
-        })))
-
-      if (fieldsError) {
-        console.warn('Erreur lors de la création des champs:', fieldsError)
-        // On continue même si les champs échouent
-      }
-
-      // 10. Construire les URLs
-      const marketplaceUrl = `${request.subdomain}.spares-tech.com`
+      // 5. Construire les URLs
+      const marketplaceUrl = `https://${request.subdomain}.spares-tech.com`
       const adminLoginUrl = `${marketplaceUrl}/admin/login`
 
       return {
         success: true,
         tenant_id: tenant.id,
         marketplace_url: marketplaceUrl,
-        admin_login_url: adminLoginUrl,
-        subscription_id: subscription.id
+        admin_login_url: adminLoginUrl
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('Erreur lors de la création du marketplace:', error)
       return {
         success: false,
@@ -346,27 +340,27 @@ export const startupMarketplaceService = {
   }>> => {
     try {
       const { data, error } = await supabase
-        .from('startup.subscriptions')
+        .from('customer_subscriptions')
         .select(`
           tenant_id,
           status,
           created_at,
-          plan:startup.subscription_plans(name, display_name),
-          tenant:public.tenants(name, subdomain, custom_domain)
+          subscription_plans(name, display_name),
+          tenants(name, subdomain, custom_domain)
         `)
         .eq('customer_id', customerId)
 
       if (error) throw error
 
-      return (data || []).map(sub => ({
+      return (data || []).map((sub: Record<string, unknown>) => ({
         tenant_id: sub.tenant_id,
-        tenant_name: sub.tenant?.name || '',
-        subdomain: sub.tenant?.subdomain || '',
-        custom_domain: sub.tenant?.custom_domain,
-        marketplace_url: sub.tenant?.custom_domain || `${sub.tenant?.subdomain}.spares-tech.com`,
-        subscription_status: sub.status,
-        plan_name: sub.plan?.display_name || '',
-        created_at: sub.created_at
+        tenant_name: (sub.public_tenants as Record<string, unknown>)?.name as string || '',
+        subdomain: (sub.public_tenants as Record<string, unknown>)?.subdomain as string || '',
+        custom_domain: (sub.public_tenants as Record<string, unknown>)?.custom_domain as string,
+        marketplace_url: (sub.public_tenants as Record<string, unknown>)?.custom_domain as string || `${(sub.public_tenants as Record<string, unknown>)?.subdomain}.spares-tech.com`,
+        subscription_status: sub.status as string,
+        plan_name: (sub.startup_subscription_plans as Record<string, unknown>)?.display_name as string || '',
+        created_at: sub.created_at as string
       }))
     } catch (error) {
       console.error('Erreur lors de la récupération des marketplaces:', error)
@@ -391,13 +385,13 @@ export const startupMarketplaceService = {
   }> => {
     try {
       const { data, error } = await supabase
-        .from('startup.subscriptions')
+        .from('customer_subscriptions')
         .select(`
           status,
           created_at,
-          customer:startup.customers(first_name, last_name, company_name),
-          tenant:public.tenants(name, subdomain),
-          plan:startup.subscription_plans(price_monthly, price_yearly),
+          startup_customers(first_name, last_name, company_name),
+          public_tenants(name, subdomain),
+          startup_subscription_plans(price_monthly, price_yearly),
           billing_cycle
         `)
         .order('created_at', { ascending: false })
@@ -405,28 +399,29 @@ export const startupMarketplaceService = {
       if (error) throw error
 
       const subscriptions = data || []
-      const active = subscriptions.filter(sub => sub.status === 'active')
+      const active = subscriptions.filter((sub: Record<string, unknown>) => sub.status === 'active')
       
       let totalRevenue = 0
-      active.forEach(sub => {
-        if (sub.plan) {
+      active.forEach((sub: Record<string, unknown>) => {
+        if (sub.startup_subscription_plans) {
+          const plans = sub.startup_subscription_plans as Record<string, unknown>
           if (sub.billing_cycle === 'monthly') {
-            totalRevenue += sub.plan.price_monthly * 12 // ARR
-          } else if (sub.billing_cycle === 'yearly' && sub.plan.price_yearly) {
-            totalRevenue += sub.plan.price_yearly
+            totalRevenue += (plans.price_monthly as number) * 12 // ARR
+          } else if (sub.billing_cycle === 'yearly' && plans.price_yearly) {
+            totalRevenue += plans.price_yearly as number
           }
         }
       })
 
-      const recentMarketplaces = subscriptions.slice(0, 5).map(sub => ({
-        tenant_name: sub.tenant?.name || '',
-        subdomain: sub.tenant?.subdomain || '',
-        customer_name: sub.customer ? `${sub.customer.first_name} ${sub.customer.last_name}` : '',
-        created_at: sub.created_at
+      const recentMarketplaces = subscriptions.slice(0, 5).map((sub: Record<string, unknown>) => ({
+        tenant_name: (sub.public_tenants as Record<string, unknown>)?.name as string || '',
+        subdomain: (sub.public_tenants as Record<string, unknown>)?.subdomain as string || '',
+        customer_name: sub.startup_customers ? `${(sub.startup_customers as Record<string, unknown>).first_name} ${(sub.startup_customers as Record<string, unknown>).last_name}` : '',
+        created_at: sub.created_at as string
       }))
 
       // Compter les clients uniques
-      const uniqueCustomers = new Set(subscriptions.map(sub => sub.customer?.company_name).filter(Boolean))
+      const uniqueCustomers = new Set(subscriptions.map((sub: Record<string, unknown>) => (sub.startup_customers as Record<string, unknown>)?.company_name).filter(Boolean))
 
       return {
         totalMarketplaces: subscriptions.length,

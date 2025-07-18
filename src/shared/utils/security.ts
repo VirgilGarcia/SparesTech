@@ -13,7 +13,7 @@ export const security = {
   },
 
   // Nettoyer les données d'entrée
-  sanitizeData(data: any): any {
+  sanitizeData(data: unknown): unknown {
     if (typeof data === 'string') {
       return this.sanitizeString(data)
     }
@@ -23,7 +23,7 @@ export const security = {
     }
     
     if (typeof data === 'object' && data !== null) {
-      const sanitized: any = {}
+      const sanitized: Record<string, unknown> = {}
       for (const [key, value] of Object.entries(data)) {
         sanitized[key] = this.sanitizeData(value)
       }
@@ -134,7 +134,7 @@ export const security = {
   },
 
   // Valider les données de formulaire
-  validateFormData(data: Record<string, any>, schema: Record<string, (value: any) => boolean>): {
+  validateFormData(data: Record<string, unknown>, schema: Record<string, (value: unknown) => boolean>): {
     isValid: boolean
     errors: Record<string, string>
   } {

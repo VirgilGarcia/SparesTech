@@ -4,6 +4,13 @@ interface ErrorInfo {
   details?: string
 }
 
+interface SupabaseError {
+  message?: string
+  code?: string
+  status?: number
+  stack?: string
+}
+
 export const errorHandler = {
   // Erreurs génériques pour l'utilisateur
   get userFriendlyErrors() {
@@ -23,7 +30,7 @@ export const errorHandler = {
   },
 
   // Traiter les erreurs Supabase
-  handleSupabaseError(error: any): ErrorInfo {
+  handleSupabaseError(error: SupabaseError | Error | unknown): ErrorInfo {
     if (!error) {
       return { message: this.userFriendlyErrors.UNKNOWN_ERROR }
     }
@@ -79,13 +86,13 @@ export const errorHandler = {
   },
 
   // Logger les erreurs pour le debugging (en développement seulement)
-  logError(error: any, context?: string): void {
+  logError(error: SupabaseError | Error | unknown, context?: string): void {
     if (import.meta.env.DEV) {
       console.group(`Erreur${context ? ` dans ${context}` : ''}`)
       console.error('Erreur complète:', error)
-      console.error('Message:', error?.message)
-      console.error('Code:', error?.code)
-      console.error('Stack:', error?.stack)
+      console.error('Message:', (error as SupabaseError)?.message)
+      console.error('Code:', (error as SupabaseError)?.code)
+      console.error('Stack:', (error as Error)?.stack)
       console.groupEnd()
     }
   },
@@ -110,7 +117,7 @@ export const errorHandler = {
   },
 
   // Créer une erreur sécurisée pour l'utilisateur
-  createUserError(error: any, context?: string): ErrorInfo {
+  createUserError(error: SupabaseError | Error | unknown, context?: string): ErrorInfo {
     this.logError(error, context)
     
     const supabaseError = this.handleSupabaseError(error)
@@ -124,7 +131,7 @@ export const errorHandler = {
   },
 
   // Obtenir un message d'erreur simple pour l'utilisateur
-  getErrorMessage(error: any, context?: string): string {
+  getErrorMessage(error: SupabaseError | Error | unknown, context?: string): string {
     return this.createUserError(error, context).message
   }
 } 

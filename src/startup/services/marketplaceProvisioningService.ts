@@ -1,8 +1,5 @@
-import { supabase } from '../lib/supabase'
-import { settingsService } from './saas/settingsService'
-import { productStructureService } from './saas/productStructureService'
-import { categoryService } from './saas/categoryService'
-import type { MarketplaceCreationRequest, TenantCreationResult } from '../types/marketplace'
+import { supabase } from '../../lib/supabase'
+import type { MarketplaceCreationRequest, TenantCreationResult } from '../../shared/types/marketplace'
 
 export const marketplaceProvisioningService = {
   
@@ -170,7 +167,7 @@ export const marketplaceProvisioningService = {
       // Générer un sous-domaine unique si nécessaire
       let finalSubdomain = request.subdomain.toLowerCase().trim()
       
-      // Ajouter un timestamp pour garantir l'unicité lors des tests
+      // Garantir l'unicité des sous-domaines de test
       if (finalSubdomain === 'test' || finalSubdomain === 'demo' || finalSubdomain === 'acme') {
         finalSubdomain = `${finalSubdomain}-${Date.now()}`
       }
@@ -214,7 +211,7 @@ export const marketplaceProvisioningService = {
         success: true
       }
 
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error('❌ Erreur lors de la création du marketplace:', error)
 
       return {
@@ -223,7 +220,7 @@ export const marketplaceProvisioningService = {
         marketplace_url: '',
         admin_login_url: '',
         success: false,
-        errors: [error.message || 'Erreur technique lors de la création']
+        errors: [(error as Error).message || 'Erreur technique lors de la création']
       }
     }
   },
@@ -233,7 +230,7 @@ export const marketplaceProvisioningService = {
    */
   cleanupFailedMarketplace: async (tenant_id: string, admin_user_id?: string): Promise<void> => {
     try {
-      console.log('🧹 Nettoyage des données après échec...')
+      
 
       // Supprimer les paramètres
       await supabase
@@ -267,7 +264,7 @@ export const marketplaceProvisioningService = {
         .delete()
         .eq('id', tenant_id)
 
-      console.log('✅ Nettoyage terminé')
+      
     } catch (error) {
       console.error('❌ Erreur lors du nettoyage:', error)
     }
