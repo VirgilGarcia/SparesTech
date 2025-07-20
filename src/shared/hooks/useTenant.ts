@@ -16,17 +16,23 @@ export function useTenant() {
       setLoading(true)
       setError(null)
 
-      // Charger le tenant et le profil en parallèle
-      const [tenantData, profileData] = await Promise.all([
-        tenantService.getUserTenant(user.id),
-        tenantService.getUserProfile(user.id)
-      ])
-
-      setTenant(tenantData)
+      // Charger d'abord le profil pour éviter la récursion
+      const profileData = await tenantService.getUserProfile(user.id)
       setUserProfile(profileData)
+
+      // Charger le tenant seulement si l'utilisateur a un profil SaaS
+      if (profileData?.tenant_id) {
+        const tenantData = await tenantService.getUserTenant(user.id)
+        setTenant(tenantData)
+      } else {
+        setTenant(null)
+      }
     } catch (err) {
       console.error('Erreur lors du chargement des données tenant:', err)
       setError(err instanceof Error ? err.message : 'Erreur inconnue')
+      // Définir des valeurs par défaut en cas d'erreur
+      setTenant(null)
+      setUserProfile(null)
     } finally {
       setLoading(false)
     }

@@ -25,7 +25,7 @@ const LogoSettings: React.FC<LogoSettingsProps> = ({ logoPreview, onRemoveLogo }
     if (!file) return
     
     // Logique d'upload du fichier
-    console.log('Upload du fichier:', file)
+    // TODO: Implémenter la logique d'upload
   }
 
   return (

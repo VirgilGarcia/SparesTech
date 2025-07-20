@@ -242,19 +242,25 @@ function OrderDetail() {
             </div>
 
             {/* Adresse de livraison */}
-            {(order.customer_address || order.customer_city || order.customer_postal_code) && (
+            {(order.shipping_address_line1 || order.shipping_city || order.shipping_postal_code) && (
               <div className="bg-white rounded-lg border border-gray-100">
                 <div className="px-6 py-6 border-b border-gray-100">
                   <h2 className="text-lg font-medium text-gray-900">Adresse de livraison</h2>
                 </div>
                 <div className="p-6 space-y-2">
-                  {order.customer_address && (
-                    <p className="text-gray-700">{order.customer_address}</p>
+                  {order.shipping_address_line1 && (
+                    <p className="text-gray-700">{order.shipping_address_line1}</p>
                   )}
-                  {(order.customer_city || order.customer_postal_code) && (
+                  {order.shipping_address_line2 && (
+                    <p className="text-gray-700">{order.shipping_address_line2}</p>
+                  )}
+                  {(order.shipping_city || order.shipping_postal_code) && (
                     <p className="text-gray-700">
-                      {order.customer_postal_code} {order.customer_city}
+                      {order.shipping_postal_code} {order.shipping_city}
                     </p>
+                  )}
+                  {order.shipping_country && (
+                    <p className="text-gray-700">{order.shipping_country}</p>
                   )}
                 </div>
               </div>

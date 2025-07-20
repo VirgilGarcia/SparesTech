@@ -97,7 +97,7 @@ const MarketplaceForm: React.FC<MarketplaceFormProps> = ({
                   required
                 />
                 <div className="px-3 py-2 bg-gray-100 border border-l-0 border-gray-300 rounded-r-md text-gray-600">
-                  .sparestech.fr
+                  .spartelio.com
                 </div>
               </div>
               {checkingSubdomain && (

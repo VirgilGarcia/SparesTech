@@ -1,5 +1,5 @@
-import { supabase } from '../../lib/supabase'
 import type { DomainInfo } from '../types/marketplace'
+import { useDomainApi } from '../../hooks/api/useDomainApi'
 
 /**
  * Analyse le domaine actuel pour déterminer quel tenant afficher
@@ -33,8 +33,8 @@ export function parseDomain(): DomainInfo {
   }
   
   // Développement local avec domaines .local
-  if (hostname.endsWith('.sparestech.local')) {
-    const subdomain = hostname.replace('.sparestech.local', '')
+  if (hostname.endsWith('.spartelio.local')) {
+    const subdomain = hostname.replace('.spartelio.local', '')
     
     if (subdomain === 'www' || subdomain === '') {
       return {
@@ -55,7 +55,7 @@ export function parseDomain(): DomainInfo {
     }
   }
   
-  if (hostname === 'sparestech.local') {
+  if (hostname === 'spartelio.local') {
     return {
       isMainSite: true,
       subdomain: null,
@@ -65,8 +65,8 @@ export function parseDomain(): DomainInfo {
     }
   }
   
-  // Production - domaine principal SparesTech
-  if (hostname === 'sparestech.com' || hostname === 'www.sparestech.com') {
+  // Production - domaine principal Spartelio
+  if (hostname === 'spartelio.com' || hostname === 'www.spartelio.com') {
     return {
       isMainSite: true,
       subdomain: null,
@@ -76,9 +76,9 @@ export function parseDomain(): DomainInfo {
     }
   }
   
-  // Sous-domaine SparesTech (client.sparestech.com)
-  if (hostname.endsWith('.sparestech.com')) {
-    const subdomain = hostname.replace('.sparestech.com', '')
+  // Sous-domaine Spartelio (client.spartelio.com)
+  if (hostname.endsWith('.spartelio.com')) {
+    const subdomain = hostname.replace('.spartelio.com', '')
     
     // Exclure les sous-domaines système
     const systemSubdomains = ['www', 'api', 'admin', 'app', 'dashboard']
@@ -115,47 +115,8 @@ export function parseDomain(): DomainInfo {
  * Résout le tenant_id basé sur le domaine
  */
 export async function resolveTenantFromDomain(domainInfo: DomainInfo): Promise<string | null> {
-  if (domainInfo.isMainSite) {
-    return null
-  }
-  
-  try {
-    let query = supabase
-      .from('marketplace_settings')
-      .select('tenant_id')
-      .limit(1)
-    
-    // Recherche par sous-domaine
-    if (domainInfo.subdomain) {
-      console.log('🔍 Searching for subdomain:', domainInfo.subdomain)
-      query = query.eq('subdomain', domainInfo.subdomain)
-    }
-    // Recherche par domaine personnalisé
-    else if (domainInfo.customDomain) {
-      console.log('🔍 Searching for custom domain:', domainInfo.customDomain)
-      query = query.eq('custom_domain', domainInfo.customDomain)
-    }
-    else {
-      console.log('❌ No subdomain or custom domain to search for')
-      return null
-    }
-    
-    const { data, error } = await query.single()
-    
-    console.log('🔍 Database query result:', { data, error })
-    
-    if (error || !data) {
-      console.warn('❌ Aucun tenant trouvé pour le domaine:', domainInfo, 'Error:', error)
-      return null
-    }
-    
-    console.log('✅ Tenant found:', data.tenant_id)
-    return data.tenant_id
-    
-  } catch (error) {
-    console.error('❌ Erreur lors de la résolution du tenant:', error)
-    return null
-  }
+  const domainApi = useDomainApi()
+  return domainApi.resolveTenantFromDomain(domainInfo)
 }
 
 /**
@@ -173,7 +134,7 @@ export async function getCurrentDomainInfo(): Promise<DomainInfo> {
 }
 
 /**
- * Vérifie si nous sommes sur le site principal SparesTech
+ * Vérifie si nous sommes sur le site principal Spartelio
  */
 export function isMainSite(): boolean {
   const domainInfo = parseDomain()
@@ -187,7 +148,7 @@ export function redirectToMainSite(): void {
   if (window.location.hostname === 'localhost') {
     window.location.href = 'http://localhost:5173/'
   } else {
-    window.location.href = 'https://sparestech.com/'
+    window.location.href = 'https://spartelio.com/'
   }
 }
 
@@ -198,5 +159,5 @@ export function generateMarketplaceUrl(subdomain: string): string {
   if (window.location.hostname === 'localhost') {
     return `http://localhost:5173/?tenant=${subdomain}` // Pour le dev
   }
-  return `https://${subdomain}.sparestech.com/`
+  return `https://${subdomain}.spartelio.com/`
 }

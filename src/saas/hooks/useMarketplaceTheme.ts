@@ -1,11 +1,10 @@
 import { useState, useEffect } from 'react'
-import { settingsService } from '../services/settingsService'
-import type { MarketplaceSettings } from '../services/settingsService'
-import { supabase } from '../../lib/supabase'
+import { useSettingsApi, type MarketplaceSettings } from '../../hooks/api/useSettingsApi'
 
 export function useMarketplaceTheme() {
   const [settings, setSettings] = useState<MarketplaceSettings | null>(null)
   const [loading, setLoading] = useState(true)
+  const { getAdminSettings } = useSettingsApi()
 
   useEffect(() => {
     loadGlobalSettings()
@@ -25,16 +24,9 @@ export function useMarketplaceTheme() {
     try {
       setLoading(true)
       
-      // Pour l'instant, on prend les settings du premier admin
-      const { data: adminProfile } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('role', 'admin')
-        .limit(1)
-        .single()
-
-      if (adminProfile) {
-        const adminSettings = await settingsService.getSettings(adminProfile.id)
+      // Récupérer les settings via l'API
+      const adminSettings = await getAdminSettings()
+      if (adminSettings) {
         setSettings(adminSettings)
       }
     } catch (error) {
@@ -55,7 +47,7 @@ export function useMarketplaceTheme() {
     // Helpers pour faciliter l'usage
     theme: {
       primaryColor: settings?.primary_color || '#10b981',
-      companyName: settings?.company_name || 'SparesTech',
+      companyName: settings?.company_name || 'Spartelio',
       logoUrl: settings?.logo_url || null
     },
     display: {

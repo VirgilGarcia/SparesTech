@@ -98,7 +98,7 @@ const MarketplaceConfigForm: React.FC<MarketplaceConfigFormProps> = ({
                     required
                   />
                   <div className="px-4 py-3 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600 flex items-center">
-                    .sparestech.fr
+                    .spartelio.com
                   </div>
                 </div>
                 {checkingSubdomain && (
@@ -131,7 +131,7 @@ const MarketplaceConfigForm: React.FC<MarketplaceConfigFormProps> = ({
               )}
               
               <p className="mt-1 text-sm text-gray-500">
-                Votre marketplace sera accessible à l'adresse: <strong>{formData.subdomain || 'votre-domaine'}.sparestech.fr</strong>
+                Votre marketplace sera accessible à l'adresse: <strong>{formData.subdomain || 'votre-domaine'}.spartelio.com</strong>
               </p>
             </div>
           ) : (

@@ -1,9 +1,9 @@
 import React, { useState, useEffect } from 'react'
 import { useNavigate, useSearchParams } from 'react-router-dom'
 import { useAuth } from '../../shared/context/AuthContext'
-import { startupMarketplaceService } from '../services/marketplaceService'
-import { startupSubscriptionService, type StartupSubscriptionPlan } from '../services/subscriptionService'
-import { marketplaceProvisioningService } from '../services/marketplaceProvisioningService'
+import { useToast } from '../../shared/context/ToastContext'
+import { useMarketplaceApi, type SubscriptionPlan, type MarketplaceCreationRequest } from '../../hooks/api/useMarketplaceApi'
+import { useAuthApi } from '../../hooks/api/useAuthApi'
 import Header from '../components/Header'
 import Breadcrumb from '../components/Breadcrumb'
 import MarketplaceConfigForm from '../components/checkout/MarketplaceConfigForm'
@@ -13,14 +13,19 @@ import PlanSummary from '../components/checkout/PlanSummary'
 
 const MarketplaceCheckout: React.FC = () => {
   const { user } = useAuth()
+  const { showError, showSuccess } = useToast()
   const navigate = useNavigate()
   const [searchParams] = useSearchParams()
-  const [selectedPlan, setSelectedPlan] = useState<StartupSubscriptionPlan | null>(null)
+  const [selectedPlan, setSelectedPlan] = useState<SubscriptionPlan | null>(null)
   const [billingCycle, setBillingCycle] = useState<'monthly' | 'yearly'>('monthly')
   const [step, setStep] = useState<'loading' | 'config' | 'creating' | 'success'>('loading')
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
   const [marketplaceUrl, setMarketplaceUrl] = useState<string | null>(null)
+
+  // Hooks API
+  const { getPlan, checkSubdomainAvailability, generateSubdomainSuggestions, createMarketplace } = useMarketplaceApi()
+  const { createOrGetProfile } = useAuthApi()
 
   const [formData, setFormData] = useState({
     marketplace_name: '',
@@ -55,17 +60,17 @@ const MarketplaceCheckout: React.FC = () => {
       }
 
       // Charger le plan depuis l'API
-      const plan = await startupSubscriptionService.getPlanById(planId)
+      const plan = await getPlan(planId)
       if (plan) {
         setSelectedPlan(plan)
         setStep('config')
       } else {
-        setError('Plan non trouvé')
+        showError('Plan non trouvé')
         navigate('/pricing')
       }
     } catch (error) {
       console.error('Erreur lors du chargement du plan:', error)
-      setError('Erreur lors du chargement du plan')
+      showError('Erreur lors du chargement du plan')
       navigate('/pricing')
     }
   }
@@ -78,36 +83,46 @@ const MarketplaceCheckout: React.FC = () => {
 
     // Vérifier la disponibilité du sous-domaine en temps réel
     if (field === 'subdomain' && typeof value === 'string' && value.length > 2) {
-      checkSubdomainAvailability(value)
+      handleCheckSubdomainAvailability(value)
     }
 
     // Générer des suggestions de sous-domaine basées sur le nom
     if (field === 'marketplace_name' && typeof value === 'string' && value.length > 2) {
-      generateSubdomainSuggestions(value)
-      // Auto-remplir le sous-domaine si vide
-      if (!formData.subdomain) {
-        const cleanName = value.toLowerCase()
-          .replace(/[^a-z0-9-]/g, '-')
-          .replace(/-+/g, '-')
-          .replace(/^-|-$/g, '')
-        setFormData(prev => ({ ...prev, subdomain: cleanName }))
-        if (cleanName.length > 2) {
-          checkSubdomainAvailability(cleanName)
-        }
-      }
+      handleGenerateSubdomainSuggestions(value)
+      // Ne plus auto-remplir le champ, laisser vide pour que l'utilisateur choisisse
     }
   }
 
-  const checkSubdomainAvailability = async (subdomain: string) => {
+  const handleCheckSubdomainAvailability = async (subdomain: string) => {
     setCheckingSubdomain(true)
     setSubdomainError(null)
+    
     try {
-      const isAvailable = await marketplaceProvisioningService.checkSubdomainAvailability(subdomain)
-      if (!isAvailable) {
-        setSubdomainError('Ce sous-domaine n\'est pas disponible')
+      // Validation de format en temps réel
+      const subdomainRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/
+      const reserved = ['www', 'api', 'admin', 'app', 'mail', 'ftp', 'blog', 'shop', 'store']
+      
+      if (!subdomainRegex.test(subdomain.toLowerCase())) {
+        setSubdomainError('Format invalide : lettres, chiffres et tirets seulement')
+      } else if (reserved.includes(subdomain.toLowerCase())) {
+        setSubdomainError('Ce sous-domaine est réservé')
         // Générer automatiquement des suggestions
         if (formData.marketplace_name) {
-          generateSubdomainSuggestions(formData.marketplace_name)
+          handleGenerateSubdomainSuggestions(formData.marketplace_name)
+        }
+      } else if (subdomain.length < 2) {
+        setSubdomainError('Le sous-domaine doit contenir au moins 2 caractères')
+      } else {
+        // Vérifier la disponibilité via l'API
+        const isAvailable = await checkSubdomainAvailability(subdomain)
+        if (!isAvailable) {
+          setSubdomainError('Ce sous-domaine n\'est pas disponible')
+          // Générer automatiquement des suggestions
+          if (formData.marketplace_name) {
+            handleGenerateSubdomainSuggestions(formData.marketplace_name)
+          }
+        } else {
+          setSubdomainError(null)
         }
       }
     } catch (error) {
@@ -118,9 +133,9 @@ const MarketplaceCheckout: React.FC = () => {
     }
   }
 
-  const generateSubdomainSuggestions = async (baseName: string) => {
+  const handleGenerateSubdomainSuggestions = async (baseName: string) => {
     try {
-      const suggestions = await marketplaceProvisioningService.generateSubdomainSuggestions(baseName)
+      const suggestions = await generateSubdomainSuggestions(baseName)
       setSubdomainSuggestions(suggestions.slice(0, 3)) // Limiter à 3 suggestions
     } catch (error) {
       console.error('Erreur lors de la génération de suggestions:', error)
@@ -138,78 +153,71 @@ const MarketplaceCheckout: React.FC = () => {
 
     // Validation complète
     if (!formData.marketplace_name.trim()) {
-      setError('Le nom du marketplace est requis')
+      showError('Le nom du marketplace est requis')
       setLoading(false)
       setStep('config')
       return
     }
 
     if (!formData.subdomain.trim() && !hasCustomDomain) {
-      setError('Le sous-domaine est requis')
+      showError('Le sous-domaine est requis')
       setLoading(false)
       setStep('config')
       return
     }
 
     if (hasCustomDomain && !formData.custom_domain.trim()) {
-      setError('Le domaine personnalisé est requis')
+      showError('Le domaine personnalisé est requis')
       setLoading(false)
       setStep('config')
       return
     }
 
     if (subdomainError) {
-      setError('Veuillez choisir un sous-domaine disponible')
+      showError('Veuillez choisir un sous-domaine disponible')
       setLoading(false)
       setStep('config')
       return
     }
 
     try {
-      // Créer le prospect
-      const prospect = await startupMarketplaceService.createProspect({
+      // S'assurer que le profil startup existe
+      await createOrGetProfile({
         email: user.email || '',
         first_name: user.user_metadata?.first_name || '',
         last_name: user.user_metadata?.last_name || '',
         company_name: formData.marketplace_name,
-        phone: user.user_metadata?.phone || '',
-        selected_plan_id: selectedPlan.id,
-        desired_subdomain: hasCustomDomain ? undefined : formData.subdomain
+        phone: user.user_metadata?.phone || ''
       })
 
-      if (prospect?.error) {
-        setError(prospect.error)
-        setStep('config')
-        return
-      }
-
-      // Créer le marketplace
-      const marketplace = await startupMarketplaceService.createMarketplaceDev({
-        prospectId: prospect?.id!,
+      // Préparer les données de création du marketplace
+      const marketplaceData: MarketplaceCreationRequest = {
         company_name: formData.marketplace_name,
         admin_first_name: user.user_metadata?.first_name || '',
         admin_last_name: user.user_metadata?.last_name || '',
         admin_email: user.email || '',
-        admin_password: crypto.randomUUID().replace(/-/g, '').substring(0, 16),
-        subdomain: hasCustomDomain ? undefined : formData.subdomain,
+        subdomain: hasCustomDomain ? '' : formData.subdomain,
         custom_domain: hasCustomDomain ? formData.custom_domain : undefined,
         public_access: formData.public_access,
+        primary_color: formData.primary_color,
         plan_id: selectedPlan.id,
-        billing_cycle: billingCycle,
-        user_id: user.id,
-        primary_color: formData.primary_color
-      })
+        billing_cycle: billingCycle
+      }
 
-      if (marketplace?.url) {
-        setMarketplaceUrl(marketplace.url)
+      // Créer le marketplace via l'API
+      const result = await createMarketplace(marketplaceData)
+
+      if (result) {
+        setMarketplaceUrl(result.marketplace_url)
+        showSuccess('Marketplace créé avec succès ! Redirection en cours...')
         setStep('success')
       } else {
-        setError('Erreur lors de la création du marketplace')
+        showError('Erreur lors de la création du marketplace')
         setStep('config')
       }
     } catch (error) {
       console.error('Erreur lors de la création:', error)
-      setError('Erreur lors de la création du marketplace')
+      showError('Erreur lors de la création du marketplace')
       setStep('config')
     } finally {
       setLoading(false)

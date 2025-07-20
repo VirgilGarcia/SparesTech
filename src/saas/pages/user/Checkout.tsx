@@ -104,8 +104,7 @@ function Checkout() {
           postal_code: formData.postalCode
         })
       } catch (error) {
-        console.warn('Impossible de sauvegarder l\'adresse:', error)
-        // On continue même si la sauvegarde échoue
+        // On continue même si la sauvegarde échoue - erreur non critique
       }
 
       // Afficher le message de succès

@@ -158,11 +158,11 @@ const CheckoutForm: React.FC<CheckoutFormProps> = ({
                 title="Seuls les lettres, chiffres et tirets sont autorisés"
               />
               <div className="px-4 py-3 bg-gray-100 border border-l-0 border-gray-300 rounded-r-lg text-gray-600">
-                .sparestech.fr
+                .spartelio.com
               </div>
             </div>
             <p className="text-sm text-gray-500 mt-1">
-              Votre marketplace sera accessible sur https://{formData.desired_subdomain || 'mon-entreprise'}.sparestech.fr
+              Votre marketplace sera accessible sur https://{formData.desired_subdomain || 'mon-entreprise'}.spartelio.com
             </p>
           </div>
 

@@ -1,27 +1,20 @@
 import { useState, useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../../shared/context/AuthContext'
+import { useToast } from '../../../shared/context/ToastContext'
 import { useMarketplaceTheme } from '../../hooks/useMarketplaceTheme'
-import { supabase } from '../../../lib/supabase'
-import { settingsService } from '../../services/settingsService'
+import { useUserApi, type UserProfile } from '../../../hooks/api/useUserApi'
+import { useRole } from '../../../shared/hooks/useRole'
 import Header from '../../components/layout/Header'
 import { UserList, UserFilters, CreateUserModal, UserStats } from '../../components/user'
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog'
 
-interface User {
-  id: string
-  email: string
-  role: 'admin' | 'client'
-  created_at: string
-  is_active: boolean
-}
-
 function AdminUsers() {
   const { user, loading: authLoading } = useAuth()
+  const { showError, showSuccess } = useToast()
   const { theme } = useMarketplaceTheme()
-  const [userRole, setUserRole] = useState<string | null>(null)
-  const [roleLoading, setRoleLoading] = useState(false)
-  const [users, setUsers] = useState<User[]>([])
+  const { profile, loading: roleLoading, isAdmin } = useRole()
+  const [users, setUsers] = useState<UserProfile[]>([])
   const [loading, setLoading] = useState(true)
   const [creating, setCreating] = useState(false)
   const [showCreateModal, setShowCreateModal] = useState(false)
@@ -32,6 +25,9 @@ function AdminUsers() {
   const [searchQuery, setSearchQuery] = useState('')
   const [showArchived, setShowArchived] = useState(false)
 
+  // Hook API
+  const { getUsers, createUser, updateUser } = useUserApi()
+
   // Form state
   const [newUser, setNewUser] = useState({
     email: '',
@@ -39,62 +35,16 @@ function AdminUsers() {
   })
 
   useEffect(() => {
-    if (user) {
-      loadUserRole()
-      loadSettings()
-    }
-  }, [user])
-
-  useEffect(() => {
-    if (userRole === 'admin') {
+    if (isAdmin) {
       loadUsers()
     }
-  }, [userRole])
-
-  const loadUserRole = async () => {
-    if (!user) return
-    
-    try {
-      setRoleLoading(true)
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (error) throw error
-      setUserRole(data.role)
-    } catch (error) {
-      console.error('Erreur lors du chargement du rôle:', error)
-      setUserRole('client')
-    } finally {
-      setRoleLoading(false)
-    }
-  }
-
-  const loadSettings = async () => {
-    try {
-      await settingsService.getPublicSettings()
-    } catch (error) {
-      console.error('Erreur lors du chargement des paramètres:', error)
-    }
-  }
+  }, [isAdmin])
 
   const loadUsers = async () => {
     try {
       setLoading(true)
-      
-      const { data: profiles, error } = await supabase
-        .from('user_profiles')
-        .select('id, role, created_at, email, is_active')
-        .order('created_at', { ascending: false })
-
-      if (error) {
-        console.error('Erreur SQL:', error)
-        throw error
-      }
-
-      setUsers(profiles || [])
+      const usersData = await getUsers()
+      setUsers(usersData)
     } catch (error) {
       console.error('Erreur lors du chargement des utilisateurs:', error)
       setError('Erreur lors du chargement des utilisateurs')
@@ -124,49 +74,35 @@ function AdminUsers() {
       setCreating(true)
       setValidationErrors({})
       
-      // Vérifier si l'utilisateur existe déjà
-      const { data: existingUser } = await supabase
-        .from('user_profiles')
-        .select('id')
-        .eq('email', newUser.email)
-        .single()
-      
-      if (existingUser) {
-        setValidationErrors({ email: 'Cet email est déjà utilisé' })
-        return
-      }
-      
-      // Créer l'utilisateur avec un mot de passe temporaire
-      const { data: authData, error: authError } = await supabase.auth.admin.createUser({
+      // Créer l'utilisateur via l'API
+      const userData = {
         email: newUser.email,
-        password: 'TempPass123!',
-        email_confirm: true
-      })
+        first_name: '',
+        last_name: '',
+        role: newUser.role,
+        is_active: true,
+        country: 'FR',
+        phone: '',
+        address: '',
+        city: '',
+        postal_code: '',
+        tenant_id: profile?.tenant_id || undefined
+      }
+
+      const createdUser = await createUser(userData)
       
-      if (authError) throw authError
-      
-      // Créer le profil utilisateur
-      const { error: profileError } = await supabase
-        .from('user_profiles')
-        .insert([{
-          id: authData.user.id,
-          email: newUser.email,
-          role: newUser.role,
-          is_active: true
-        }])
-      
-      if (profileError) throw profileError
-      
-      setSuccess('Utilisateur créé avec succès ! Un email de connexion a été envoyé.')
-      setNewUser({ email: '', role: 'client' })
-      setShowCreateModal(false)
-      loadUsers()
-      
-      // Effacer le message de succès après 5 secondes
-      setTimeout(() => setSuccess(''), 5000)
+      if (createdUser) {
+        showSuccess('Utilisateur créé avec succès ! Un email de connexion a été envoyé.')
+        setNewUser({ email: '', role: 'client' })
+        setShowCreateModal(false)
+        loadUsers()
+      } else {
+        setValidationErrors({ email: 'Erreur lors de la création de l\'utilisateur' })
+      }
       
     } catch (error: any) {
       console.error('Erreur lors de la création:', error)
+      showError(error.message || 'Erreur lors de la création de l\'utilisateur')
       setError(error.message || 'Erreur lors de la création de l\'utilisateur')
     } finally {
       setCreating(false)
@@ -180,17 +116,16 @@ function AdminUsers() {
     }
 
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ is_active: !isActive })
-        .eq('id', userId)
+      const updated = await updateUser(userId, { is_active: !isActive })
       
-      if (error) throw error
-      
-      // Actualiser la liste des utilisateurs
-      await loadUsers()
-      setSuccess(`Utilisateur ${isActive ? 'archivé' : 'restauré'} avec succès`)
-      setTimeout(() => setSuccess(''), 3000)
+      if (updated) {
+        // Actualiser la liste des utilisateurs
+        await loadUsers()
+        setSuccess(`Utilisateur ${isActive ? 'archivé' : 'restauré'} avec succès`)
+        setTimeout(() => setSuccess(''), 3000)
+      } else {
+        setError('Erreur lors de l\'archivage')
+      }
     } catch (error: any) {
       console.error('Erreur lors de l\'archivage:', error)
       setError(error.message)
@@ -207,17 +142,15 @@ function AdminUsers() {
     }
     
     try {
-      const { error } = await supabase
-        .from('user_profiles')
-        .update({ role: newRole })
-        .eq('id', userId)
+      const updated = await updateUser(userId, { role: newRole })
       
-      if (error) throw error
-      
-      setSuccess('Rôle modifié avec succès')
-      loadUsers()
-      
-      setTimeout(() => setSuccess(''), 5000)
+      if (updated) {
+        setSuccess('Rôle modifié avec succès')
+        loadUsers()
+        setTimeout(() => setSuccess(''), 5000)
+      } else {
+        setError('Erreur lors du changement de rôle')
+      }
     } catch (error: any) {
       console.error('Erreur lors du changement de rôle:', error)
       setError(error.message || 'Erreur lors du changement de rôle')
@@ -258,7 +191,7 @@ function AdminUsers() {
     return <Navigate to="/login" replace />
   }
 
-  if (userRole !== 'admin') {
+  if (!isAdmin) {
     return <Navigate to="/admin" replace />
   }
 

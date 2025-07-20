@@ -2,6 +2,9 @@ import { useEffect, useState } from 'react'
 import { Routes, Route } from 'react-router-dom'
 import { getCurrentDomainInfo } from '../../utils/domainUtils'
 import type { DomainInfo } from '../../types/marketplace'
+import { TenantProvider } from '../../context/TenantContext'
+import { MarketplaceProvider } from '../../context/ThemeContext'
+import { CartProvider } from '../../context/CartContext'
 
 // Import des composants du site principal
 import StartupRouter from '../../../startup/components/StartupRouter'
@@ -17,11 +20,13 @@ import Checkout from '../../../saas/pages/user/Checkout'
 import Profile from '../../../saas/pages/user/Profile'
 import Orders from '../../../saas/pages/user/Orders'
 import UserOrderDetail from '../../../saas/pages/user/OrderDetail'
+import OrderSuccess from '../../../saas/pages/user/OrderSuccess'
 
 // Import des composants admin
 import AdminDashboard from '../../../saas/pages/admin/Dashboard'
 import AdminProducts from '../../../saas/pages/admin/Products'
 import AdminOrders from '../../../saas/pages/admin/Orders'
+import AdminOrderDetail from '../../../saas/pages/admin/OrderDetail'
 import AdminCategories from '../../../saas/pages/admin/Categories'
 import AddProduct from '../../../saas/pages/admin/AddProduct'
 import EditProduct from '../../../saas/pages/admin/EditProduct'
@@ -44,24 +49,6 @@ function DomainRouter() {
     const initializeDomain = async () => {
       try {
         const info = await getCurrentDomainInfo()
-        
-        // Debug logging détaillé
-        console.log('🔍 Debug Domain Info:', {
-          hostname: window.location.hostname,
-          search: window.location.search,
-          href: window.location.href,
-          pathname: window.location.pathname,
-          isMainSite: info.isMainSite,
-          subdomain: info.subdomain,
-          tenantId: info.tenantId,
-          customDomain: info.customDomain
-        })
-        
-        // Debug spécifique pour le paramètre tenant
-        const urlParams = new URLSearchParams(window.location.search)
-        const tenantParam = urlParams.get('tenant')
-        console.log('🎯 Tenant param:', tenantParam)
-        console.log('🎯 All URL params:', Object.fromEntries(urlParams.entries()))
         
         setDomainInfo(info)
         
@@ -105,7 +92,7 @@ function DomainRouter() {
             <h1 className="text-2xl font-bold text-gray-900 mb-4">{error}</h1>
             <p className="text-gray-600 mb-6">Ce domaine ne correspond à aucun marketplace actif.</p>
             <a 
-              href="https://sparestech.com" 
+              href="https://spartelio.com" 
               className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 transition-colors"
             >
               Retour au site principal
@@ -120,14 +107,17 @@ function DomainRouter() {
     return <div>Erreur de configuration</div>
   }
 
-  // Site principal SparesTech - Vitrine + création de marketplace
+  // Site principal Spartelio - Vitrine + création de marketplace
   if (domainInfo.isMainSite) {
     return <StartupRouter />
   }
 
   // Marketplace client - Application complète
   return (
-    <Routes>
+    <TenantProvider>
+      <MarketplaceProvider tenantId={domainInfo.tenantId}>
+        <CartProvider>
+          <Routes>
       {/* Pages publiques */}
       <Route path="/login" element={<Login />} />
       
@@ -190,6 +180,12 @@ function DomainRouter() {
         </RequireAuth>
       } />
 
+      <Route path="/order-success" element={
+        <RequireAuth>
+          <OrderSuccess />
+        </RequireAuth>
+      } />
+
       {/* Pages d'administration - protégées par TenantGuard */}
       <Route path="/admin" element={
         <RequireAuth>
@@ -227,6 +223,14 @@ function DomainRouter() {
         <RequireAuth>
           <TenantGuard requireAdmin>
             <AdminOrders />
+          </TenantGuard>
+        </RequireAuth>
+      } />
+      
+      <Route path="/admin/orders/:id" element={
+        <RequireAuth>
+          <TenantGuard requireAdmin>
+            <AdminOrderDetail />
           </TenantGuard>
         </RequireAuth>
       } />
@@ -269,7 +273,10 @@ function DomainRouter() {
           <Home />
         </PrivateRoute>
       } />
-    </Routes>
+          </Routes>
+        </CartProvider>
+      </MarketplaceProvider>
+    </TenantProvider>
   )
 }
 

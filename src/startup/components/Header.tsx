@@ -35,7 +35,7 @@ const Header: React.FC = () => {
                   <Sparkles className="w-5 h-5 text-white" />
                 </div>
                 <h1 className="text-2xl font-bold bg-gradient-to-r from-blue-600 to-purple-600 bg-clip-text text-transparent">
-                  SparesTech
+                  Spartelio
                 </h1>
               </button>
             </div>
@@ -50,9 +50,7 @@ const Header: React.FC = () => {
               <button onClick={() => navigate('/pricing')} className="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
                 Tarifs
               </button>
-              <a href="/#testimonials" className="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors">
-                Témoignages
-              </a>
+
               <button 
                 onClick={handleDemoClick}
                 className="text-gray-500 hover:text-gray-900 px-3 py-2 rounded-md text-sm font-medium transition-colors"

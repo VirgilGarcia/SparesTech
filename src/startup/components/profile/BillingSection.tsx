@@ -1,7 +1,8 @@
 import React, { useState, useEffect } from 'react'
 import { CreditCard, FileText, Download } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
-import { getCustomerInvoices, generateInvoicePdfUrl, type Invoice } from '../../services/billingService'
+import { getCustomerInvoices, generateInvoicePdfUrl } from '../../services/billingService'
+import type { Invoice } from '../../../shared/types/billing'
 
 interface BillingSectionProps {
   user: User | null

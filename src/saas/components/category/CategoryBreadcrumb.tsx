@@ -21,13 +21,10 @@ function CategoryBreadcrumb({
 
   useEffect(() => {
     if (categoryId) {
-      console.log('🍞 CategoryBreadcrumb: Chargement du chemin pour categoryId:', categoryId)
       loadBreadcrumbPath(categoryId)
     } else if (categoryPath) {
-      console.log('🍞 CategoryBreadcrumb: Parsing du chemin:', categoryPath)
       parseCategoryPath(categoryPath)
     } else {
-      console.log('🍞 CategoryBreadcrumb: Pas de catégorie, réinitialisation du chemin')
       setBreadcrumbPath([])
     }
   }, [categoryId, categoryPath])
@@ -35,9 +32,7 @@ function CategoryBreadcrumb({
   const loadBreadcrumbPath = async (id: number) => {
     try {
       setLoading(true)
-      console.log('🍞 Chargement du chemin pour la catégorie ID:', id)
       const path = await categoryService.getCategoryPath(id)
-      console.log('🍞 Chemin de catégorie récupéré:', path)
       setBreadcrumbPath(path)
     } catch (error) {
       console.error('❌ Erreur lors du chargement du fil d\'Ariane:', error)

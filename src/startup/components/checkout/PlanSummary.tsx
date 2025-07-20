@@ -1,10 +1,10 @@
 import React from 'react'
 import { useNavigate } from 'react-router-dom'
 import { ShoppingCart, Star } from 'lucide-react'
-import type { StartupSubscriptionPlan } from '../../services/subscriptionService'
+import type { SubscriptionPlan } from '../../../hooks/api/useMarketplaceApi'
 
 interface PlanSummaryProps {
-  selectedPlan: StartupSubscriptionPlan
+  selectedPlan: SubscriptionPlan
   billingCycle: 'monthly' | 'yearly'
 }
 
@@ -15,11 +15,11 @@ const PlanSummary: React.FC<PlanSummaryProps> = ({
   const navigate = useNavigate()
 
   const getPrice = () => {
-    return billingCycle === 'monthly' ? selectedPlan.monthly_price : selectedPlan.yearly_price
+    return billingCycle === 'monthly' ? selectedPlan.price_monthly : selectedPlan.price_yearly
   }
 
-  const formatPrice = (price: number | null) => {
-    if (price === null) return 'Sur mesure'
+  const formatPrice = (price: number | null | undefined) => {
+    if (price === null || price === undefined) return 'Sur mesure'
     return new Intl.NumberFormat('fr-FR', {
       style: 'currency',
       currency: 'EUR',

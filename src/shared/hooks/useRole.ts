@@ -1,8 +1,8 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { supabase } from '../../lib/supabase'
 import { isMainSite } from '../utils/domainUtils'
 import { useTenant } from './useTenant'
+import { useUserApi } from '../../hooks/api/useUserApi'
 
 interface UserProfile {
   id: string
@@ -18,6 +18,9 @@ export function useRole() {
   const { tenantId } = useTenant()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
+  
+  // Hook API
+  const { getSaasProfile, getStartupProfile } = useUserApi()
 
   const fetchProfile = useCallback(async () => {
     if (!user) return
@@ -26,60 +29,39 @@ export function useRole() {
       const isStartupContext = isMainSite()
       
       if (isStartupContext) {
-        // Pour le contexte startup, utiliser startup_users
-        const { data, error } = await supabase
-          .from('startup_users')
-          .select('*')
-          .eq('id', user.id)
-          .single()
+        // Pour le contexte startup, utiliser l'API startup
+        const startupProfile = await getStartupProfile()
 
-        if (error) {
-          if (error.code === 'PGRST116') {
-            // Pas de profil startup trouvé
-            setProfile(null)
-            return
-          }
-          throw error
+        if (!startupProfile) {
+          setProfile(null)
+          return
         }
 
         // Adapter le format du profil startup
         setProfile({
-          id: data.id,
-          email: data.email,
-          company_name: data.company_name,
+          id: startupProfile.id,
+          email: startupProfile.email,
+          company_name: startupProfile.company_name || null,
           role: 'admin', // Les utilisateurs startup sont toujours admin
           tenant_id: null,
-          is_active: data.is_active
+          is_active: startupProfile.is_active
         })
       } else {
-        // Pour le contexte SaaS, utiliser user_profiles avec tenant_id
-        let query = supabase
-          .from('user_profiles')
-          .select('*')
-          .eq('user_id', user.id)
+        // Pour le contexte SaaS, utiliser l'API SaaS
+        const saasProfile = await getSaasProfile()
 
-        if (tenantId) {
-          query = query.eq('tenant_id', tenantId)
-        }
-
-        const { data, error } = await query.single()
-
-        if (error) {
-          if (error.code === 'PGRST116') {
-            // Pas de profil SaaS trouvé
-            setProfile(null)
-            return
-          }
-          throw error
+        if (!saasProfile) {
+          setProfile(null)
+          return
         }
 
         setProfile({
-          id: data.id,
-          email: data.email,
-          company_name: data.company_name,
-          role: data.role,
-          tenant_id: data.tenant_id,
-          is_active: data.is_active
+          id: saasProfile.id,
+          email: saasProfile.email,
+          company_name: saasProfile.company_name || null,
+          role: saasProfile.role,
+          tenant_id: saasProfile.tenant_id || null,
+          is_active: saasProfile.is_active
         })
       }
     } catch (error) {
@@ -88,7 +70,7 @@ export function useRole() {
     } finally {
       setLoading(false)
     }
-  }, [user, tenantId])
+  }, [user, tenantId, getSaasProfile, getStartupProfile])
 
   useEffect(() => {
     if (user) {

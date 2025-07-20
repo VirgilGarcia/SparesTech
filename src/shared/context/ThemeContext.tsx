@@ -26,8 +26,8 @@ interface MarketplaceContextType {
 
 const MarketplaceContext = createContext<MarketplaceContextType | undefined>(undefined)
 
-export function MarketplaceProvider({ children }: { children: React.ReactNode }) {
-  const themeData = useTheme()
+export function MarketplaceProvider({ children, tenantId }: { children: React.ReactNode; tenantId?: string }) {
+  const themeData = useTheme(tenantId)
 
   return (
     <MarketplaceContext.Provider value={themeData}>

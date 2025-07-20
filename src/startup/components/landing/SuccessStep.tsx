@@ -140,7 +140,7 @@ const SuccessStep: React.FC<SuccessStepProps> = ({ result }) => {
           </p>
           <div className="mt-2 space-x-4">
             <a
-              href="mailto:support@sparestech.fr"
+              href="mailto:support@spartelio.com"
               className="text-sm text-blue-600 hover:text-blue-800"
             >
               Contacter le support

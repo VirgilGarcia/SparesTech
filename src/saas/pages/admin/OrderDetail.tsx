@@ -3,10 +3,12 @@ import { Link, useParams } from 'react-router-dom'
 import { orderService } from '../../services/orderService'
 import type { Order } from '../../services/orderService'
 import { useAuth } from '../../../shared/context/AuthContext'
+import { useToast } from '../../../shared/context/ToastContext'
 import { Navigate } from 'react-router-dom'
 
 function OrderDetail() {
   const { user, loading: authLoading } = useAuth()
+  const { showError, showSuccess } = useToast()
   const { id } = useParams<{ id: string }>()
   const [order, setOrder] = useState<Order | null>(null)
   const [loading, setLoading] = useState(true)
@@ -35,9 +37,10 @@ function OrderDetail() {
     try {
       await orderService.updateOrderStatus(order.id, newStatus)
       setOrder({ ...order, status: newStatus })
+      showSuccess('Statut de la commande mis à jour avec succès')
     } catch (error) {
       console.error('Erreur lors de la mise à jour du statut:', error)
-      alert('Erreur lors de la mise à jour du statut')
+      showError('Erreur lors de la mise à jour du statut')
     }
   }
 

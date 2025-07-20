@@ -1,91 +1,57 @@
-import { supabase } from '../../lib/supabase'
+// ✅ MIGRÉ VERS API BACKEND
+// Ce service utilise maintenant l'API backend pour éviter les problèmes RLS
+
+// Réexport du wrapper qui utilise l'API backend
+// Note: Ce service utilise déjà useUserApi via userManagementServiceWrapper
+import { userManagementService } from './userManagementServiceWrapper'
 import type { UserProfile } from '../../shared/types/user'
 
 // Réexporter le type pour compatibilité
 export type { UserProfile }
 
 export const userProfileService = {
-  // Récupérer le profil d'un utilisateur (SaaS avec tenant_id)
+  // Récupérer le profil d'un utilisateur (SaaS avec tenant_id) - MIGRÉ vers API
   async getUserProfile(userId: string, tenantId?: string): Promise<UserProfile | null> {
-    let query = supabase
-      .from('user_profiles')
-      .select('*')
-      .eq('user_id', userId)
-
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId)
+    try {
+      // Utiliser le service de gestion des utilisateurs qui utilise déjà l'API
+      return await userManagementService.getUserById(userId)
+    } catch (error) {
+      console.error('Erreur lors de la récupération du profil utilisateur:', error)
+      return null
     }
+  },
 
-    const { data, error } = await query.single()
-
-    if (error) {
-      if (error.code === 'PGRST116') return null
+  // Créer un profil utilisateur - MIGRÉ vers API
+  async createUserProfile(profileData: {
+    id: string
+    email: string
+    tenant_id: string
+    role: 'admin' | 'client'
+    company_name?: string
+    phone?: string
+  }): Promise<UserProfile> {
+    try {
+      return await userManagementService.createUser({
+        email: profileData.email,
+        password: 'temp', // Le mot de passe sera défini par l'utilisateur
+        role: profileData.role,
+        company_name: profileData.company_name,
+        phone: profileData.phone,
+        tenant_id: profileData.tenant_id
+      })
+    } catch (error) {
+      console.error('Erreur lors de la création du profil utilisateur:', error)
       throw error
     }
-    return data
   },
 
-  // Mettre à jour le profil d'un utilisateur (SaaS avec tenant_id)
-  async updateUserProfile(userId: string, updates: Partial<UserProfile>, tenantId?: string): Promise<UserProfile> {
-    let query = supabase
-      .from('user_profiles')
-      .update({ 
-        ...updates, 
-        updated_at: new Date().toISOString() 
-      })
-      .eq('user_id', userId)
-
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId)
+  // Mettre à jour un profil utilisateur - MIGRÉ vers API
+  async updateUserProfile(userId: string, updates: Partial<UserProfile>): Promise<UserProfile> {
+    try {
+      return await userManagementService.updateUser(userId, updates)
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du profil utilisateur:', error)
+      throw error
     }
-
-    const { data, error } = await query.select().single()
-
-    if (error) throw error
-    return data
-  },
-
-  // Sauvegarder l'adresse de livraison dans le profil (SaaS avec tenant_id)
-  async saveDeliveryAddress(userId: string, addressData: {
-    address: string
-    city: string
-    postal_code: string
-  }, tenantId?: string): Promise<void> {
-    let query = supabase
-      .from('user_profiles')
-      .update({
-        address: addressData.address,
-        city: addressData.city,
-        postal_code: addressData.postal_code,
-        updated_at: new Date().toISOString()
-      })
-      .eq('user_id', userId)
-
-    if (tenantId) {
-      query = query.eq('tenant_id', tenantId)
-    }
-
-    const { error } = await query
-
-    if (error) throw error
-  },
-
-  // Alias pour getProfile (utilisé dans Profile.tsx)
-  async getProfile(userId: string, tenantId?: string): Promise<UserProfile | null> {
-    return this.getUserProfile(userId, tenantId)
-  },
-
-  // Alias pour updateProfile (utilisé dans Profile.tsx)
-  async updateProfile(userId: string, updates: Partial<UserProfile>, tenantId?: string): Promise<UserProfile> {
-    return this.updateUserProfile(userId, updates, tenantId)
-  },
-
-  // Changer le mot de passe (utilisé dans Profile.tsx)
-  async changePassword(newPassword: string): Promise<void> {
-    const { error } = await supabase.auth.updateUser({
-      password: newPassword
-    })
-
-    if (error) throw error
   }
-} 
+}

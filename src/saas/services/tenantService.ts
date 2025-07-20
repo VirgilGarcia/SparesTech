@@ -1,11 +1,15 @@
-import { supabase } from '../../lib/supabase'
-import type { Tenant, TenantUser } from '../../shared/types/tenant'
-import type { UserProfile } from '../../shared/types/user'
+// ✅ MIGRÉ VERS API BACKEND
+// Ce service utilise maintenant l'API backend pour éviter les problèmes RLS
+
+// Réexport du wrapper qui utilise l'API backend
+export { tenantService } from './tenantServiceWrapper'
 
 // Réexporter les types pour compatibilité
-export type { Tenant, TenantUser, UserProfile }
+export type { Tenant, TenantUser, TenantSettings } from '../../shared/types/tenant'
+export type { UserProfile } from '../../shared/types/user'
 
-export const tenantService = {
+// Service original maintenu pour compatibilité mais non utilisé
+const _originalTenantService = {
   
   // Récupérer le tenant d'un utilisateur
   async getUserTenant(userId: string): Promise<Tenant | null> {
@@ -14,7 +18,7 @@ export const tenantService = {
       const { data: profile } = await supabase
         .from('user_profiles')
         .select('tenant_id')
-        .eq('user_id', userId)
+        .eq('id', userId)
         .single()
       
       if (!profile?.tenant_id) return null
@@ -43,7 +47,7 @@ export const tenantService = {
     const { data, error } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('user_id', userId)
+      .eq('id', userId)
       .single()
     
     if (error) {
@@ -57,15 +61,20 @@ export const tenantService = {
   // Créer un nouveau tenant
   async createTenant(tenantData: {
     name: string
+    owner_id: string
     subdomain?: string
-    subscription_status?: 'active' | 'inactive' | 'trial'
+    custom_domain?: string
+    subscription_status?: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired'
   }): Promise<Tenant> {
     const { data, error } = await supabase
       .from('tenants')
       .insert([{
         name: tenantData.name,
+        owner_id: tenantData.owner_id,
         subdomain: tenantData.subdomain,
-        subscription_status: tenantData.subscription_status || 'active'
+        custom_domain: tenantData.custom_domain,
+        subscription_status: tenantData.subscription_status || 'trial',
+        is_active: true
       }])
       .select()
       .single()
@@ -75,13 +84,14 @@ export const tenantService = {
   },
 
   // Associer un utilisateur à un tenant
-  async addUserToTenant(tenantId: string, userId: string, role: 'admin' | 'client' = 'client'): Promise<TenantUser> {
+  async addUserToTenant(tenantId: string, userId: string, role: 'admin' | 'manager' | 'employee' | 'client' = 'client'): Promise<TenantUser> {
     const { data, error } = await supabase
       .from('tenant_users')
       .insert([{
         tenant_id: tenantId,
         user_id: userId,
-        role
+        role,
+        is_active: true
       }])
       .select()
       .single()
@@ -93,21 +103,26 @@ export const tenantService = {
   // Créer un profil utilisateur avec tenant
   async createUserProfile(profileData: {
     id: string
+    tenant_id: string
     email: string
+    first_name?: string
+    last_name?: string
     company_name?: string
     phone?: string
     address?: string
     city?: string
     postal_code?: string
     country?: string
-    role?: 'admin' | 'client'
-    tenant_id?: string
+    role?: 'admin' | 'manager' | 'employee' | 'client'
   }): Promise<UserProfile> {
     const { data, error } = await supabase
       .from('user_profiles')
       .insert([{
-        user_id: profileData.id,
+        id: profileData.id,
+        tenant_id: profileData.tenant_id,
         email: profileData.email,
+        first_name: profileData.first_name,
+        last_name: profileData.last_name,
         company_name: profileData.company_name,
         phone: profileData.phone,
         address: profileData.address,
@@ -115,7 +130,6 @@ export const tenantService = {
         postal_code: profileData.postal_code,
         country: profileData.country || 'France',
         role: profileData.role || 'client',
-        tenant_id: profileData.tenant_id,
         is_active: true
       }])
       .select()
@@ -133,7 +147,7 @@ export const tenantService = {
         ...updates,
         updated_at: new Date().toISOString()
       })
-      .eq('user_id', userId)
+      .eq('id', userId)
       .select()
       .single()
     
@@ -194,7 +208,7 @@ export const tenantService = {
   },
 
   // Mettre à jour le statut d'un tenant
-  async updateTenantStatus(tenantId: string, status: 'active' | 'inactive' | 'trial'): Promise<Tenant> {
+  async updateTenantStatus(tenantId: string, status: 'trial' | 'active' | 'past_due' | 'cancelled' | 'expired'): Promise<Tenant> {
     const { data, error } = await supabase
       .from('tenants')
       .update({
@@ -228,29 +242,112 @@ export const tenantService = {
   // Initialiser un nouveau tenant avec son admin
   async initializeTenant(tenantData: {
     name: string
+    owner_id: string
     subdomain?: string
     adminUserId: string
     adminEmail: string
+    adminFirstName?: string
+    adminLastName?: string
     adminCompanyName?: string
-  }): Promise<{ tenant: Tenant; profile: UserProfile }> {
+  }): Promise<{ tenant: Tenant; profile: UserProfile; settings: TenantSettings }> {
     // Créer le tenant
     const tenant = await this.createTenant({
       name: tenantData.name,
+      owner_id: tenantData.owner_id,
       subdomain: tenantData.subdomain
     })
 
     // Créer le profil utilisateur avec tenant
     const profile = await this.createUserProfile({
       id: tenantData.adminUserId,
+      tenant_id: tenant.id,
       email: tenantData.adminEmail,
+      first_name: tenantData.adminFirstName,
+      last_name: tenantData.adminLastName,
       company_name: tenantData.adminCompanyName,
-      role: 'admin',
-      tenant_id: tenant.id
+      role: 'admin'
     })
 
     // Associer l'utilisateur au tenant comme admin
     await this.addUserToTenant(tenant.id, tenantData.adminUserId, 'admin')
 
-    return { tenant, profile }
+    // Créer les paramètres par défaut du tenant
+    const settings = await this.createTenantSettings({
+      tenant_id: tenant.id,
+      company_name: tenantData.name,
+      primary_color: '#10b981',
+      show_prices: true,
+      show_stock: true,
+      show_categories: true,
+      public_access: true
+    })
+
+    return { tenant, profile, settings }
+  },
+
+  // Créer les paramètres d'un tenant
+  async createTenantSettings(settingsData: {
+    tenant_id: string
+    company_name: string
+    logo_url?: string
+    primary_color?: string
+    show_prices?: boolean
+    show_stock?: boolean
+    show_categories?: boolean
+    public_access?: boolean
+    contact_email?: string
+    contact_phone?: string
+  }): Promise<TenantSettings> {
+    const { data, error } = await supabase
+      .from('tenant_settings')
+      .insert([{
+        tenant_id: settingsData.tenant_id,
+        company_name: settingsData.company_name,
+        logo_url: settingsData.logo_url,
+        primary_color: settingsData.primary_color || '#10b981',
+        show_prices: settingsData.show_prices ?? true,
+        show_stock: settingsData.show_stock ?? true,
+        show_categories: settingsData.show_categories ?? true,
+        public_access: settingsData.public_access ?? true,
+        contact_email: settingsData.contact_email,
+        contact_phone: settingsData.contact_phone
+      }])
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
+  },
+
+  // Récupérer les paramètres d'un tenant
+  async getTenantSettings(tenantId: string): Promise<TenantSettings | null> {
+    const { data, error } = await supabase
+      .from('tenant_settings')
+      .select('*')
+      .eq('tenant_id', tenantId)
+      .single()
+    
+    if (error) {
+      if (error.code === 'PGRST116') return null
+      throw error
+    }
+    
+    return data
+  },
+
+  // Mettre à jour les paramètres d'un tenant
+  async updateTenantSettings(tenantId: string, updates: Partial<Omit<TenantSettings, 'id' | 'tenant_id' | 'created_at' | 'updated_at'>>): Promise<TenantSettings> {
+    const { data, error } = await supabase
+      .from('tenant_settings')
+      .update({
+        ...updates,
+        updated_at: new Date().toISOString()
+      })
+      .eq('tenant_id', tenantId)
+      .select()
+      .single()
+    
+    if (error) throw error
+    return data
   }
 }

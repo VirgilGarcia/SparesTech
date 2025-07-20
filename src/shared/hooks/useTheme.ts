@@ -1,6 +1,5 @@
 import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { useTenantContext } from '../context/TenantContext'
 import { settingsService } from '../../saas/services/settingsService'
 import type { MarketplaceSettings } from '../../saas/services/settingsService'
 
@@ -10,21 +9,30 @@ interface ThemeState {
   initialized: boolean
 }
 
-export function useTheme() {
+export function useTheme(tenantId?: string) {
   const { user } = useAuth()
-  const { tenantId } = useTenantContext()
   const [state, setState] = useState<ThemeState>({
     settings: null,
-    loading: true,
-    initialized: false
+    loading: !tenantId, // Si pas de tenantId, pas de loading
+    initialized: !tenantId
   })
   const cacheRef = useRef<Map<string, { data: MarketplaceSettings; timestamp: number }>>(new Map())
 
   const loadSettings = useCallback(async () => {
+    if (!tenantId) {
+      // Pas de tenantId = site startup, utiliser les valeurs par défaut
+      setState({
+        settings: null,
+        loading: false,
+        initialized: true
+      })
+      return
+    }
+
     try {
       setState(prev => ({ ...prev, loading: true }))
       
-      // Toujours charger les paramètres publics (globaux pour tout le marketplace)
+      // Charger les paramètres du marketplace
       const settings = await settingsService.getPublicSettings(tenantId)
       
       // Mettre en cache
@@ -32,7 +40,7 @@ export function useTheme() {
         data: settings,
         timestamp: Date.now()
       }
-      localStorage.setItem('sparestech-theme', JSON.stringify(cacheData))
+      localStorage.setItem('spartelio-theme', JSON.stringify(cacheData))
       
       setState({
         settings,
@@ -67,7 +75,7 @@ export function useTheme() {
         data: updated,
         timestamp: Date.now()
       }
-      localStorage.setItem('sparestech-theme', JSON.stringify(cacheData))
+      localStorage.setItem('spartelio-theme', JSON.stringify(cacheData))
       
       setState(prev => ({
         ...prev,
@@ -82,7 +90,7 @@ export function useTheme() {
   }
 
   const clearCache = () => {
-    localStorage.removeItem('sparestech-theme')
+    localStorage.removeItem('spartelio-theme')
     cacheRef.current.clear()
   }
 
@@ -94,7 +102,7 @@ export function useTheme() {
   // Valeurs par défaut sécurisées
   const defaultTheme = {
     primaryColor: '#10b981',
-    companyName: 'SparesTech',
+    companyName: 'Spartelio',
     logoUrl: null
   }
 

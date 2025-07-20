@@ -7,7 +7,7 @@ import Header from '../../components/layout/Header'
 import { useMarketplaceTheme } from '../../hooks/useMarketplaceTheme'
 import { ConfirmDialog } from '../../../shared/components/ui/ConfirmDialog'
 import { Toast } from '../../../shared/components/ui/Toast'
-import { supabase } from '../../../lib/supabase'
+import { useUserRole } from '../../../shared/hooks/useUserRole'
 import { categoryService } from '../../services/categoryService'
 import type { Category } from '../../services/categoryService'
 import { 
@@ -79,26 +79,13 @@ function AdminProducts() {
     }
   }
 
-  const loadUserRole = async () => {
-    if (!user) return
-    
-    try {
-      setRoleLoading(true)
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (error) throw error
-      setUserRole(data.role)
-    } catch (error) {
-      console.error('Erreur lors du chargement du rôle:', error)
-      setUserRole('client')
-    } finally {
-      setRoleLoading(false)
-    }
-  }
+  // Utiliser le hook personnalisé pour le rôle utilisateur
+  const { userRole: role, loading: roleLoading } = useUserRole()
+  
+  useEffect(() => {
+    setUserRole(role)
+    setRoleLoading(roleLoading)
+  }, [role, roleLoading])
 
   const loadProducts = async () => {
     try {

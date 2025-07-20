@@ -136,7 +136,7 @@ function MarketplaceLanding() {
       <div className="min-h-screen bg-gray-50">
         <header className="bg-white border-b border-gray-200">
           <div className="w-full px-6 lg:px-16 xl:px-32 py-6">
-            <h1 className="text-2xl font-light text-gray-900">SparesTech</h1>
+            <h1 className="text-2xl font-light text-gray-900">Spartelio</h1>
           </div>
         </header>
         
@@ -270,7 +270,7 @@ function MarketplaceLanding() {
         <div className="w-full px-6 lg:px-16 xl:px-32 py-6">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
-              <h1 className="text-2xl font-light text-gray-900">SparesTech</h1>
+              <h1 className="text-2xl font-light text-gray-900">Spartelio</h1>
               <span className="text-sm text-gray-500 font-light">Création de marketplace</span>
             </div>
             <div className="text-sm text-gray-600 font-light">
@@ -424,7 +424,7 @@ function MarketplaceLanding() {
                           pattern="[a-z0-9\-]*"
                         />
                         <div className="px-4 py-2 bg-gray-50 border border-l-0 border-gray-300 rounded-r-lg text-sm text-gray-600 font-mono">
-                          .sparestech.com
+                          .spartelio.com
                         </div>
                       </div>
                       {checkingSubdomain && (

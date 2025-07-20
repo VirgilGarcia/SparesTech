@@ -1,6 +1,6 @@
 import React from 'react'
 import { Check, Star } from 'lucide-react'
-import type { StartupSubscriptionPlan } from '../../services/subscriptionService'
+import type { StartupSubscriptionPlan } from '../../services/subscriptionServiceWrapper'
 
 interface PlanSelectorProps {
   selectedPlan: StartupSubscriptionPlan
@@ -14,7 +14,7 @@ const PlanSelector: React.FC<PlanSelectorProps> = ({
   onBillingCycleChange
 }) => {
   const getPrice = () => {
-    return billingCycle === 'monthly' ? selectedPlan.monthly_price : selectedPlan.yearly_price
+    return billingCycle === 'monthly' ? selectedPlan.price_monthly : selectedPlan.price_yearly
   }
 
   const formatPrice = (price: number | null) => {

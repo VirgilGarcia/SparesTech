@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react'
 import { useParams, useNavigate } from 'react-router-dom'
 import { productService } from '../../services/productService'
 import { useAuth } from '../../../shared/context/AuthContext'
+import { useToast } from '../../../shared/context/ToastContext'
 import { useMarketplaceTheme } from '../../hooks/useMarketplaceTheme'
 import { Navigate } from 'react-router-dom'
 import Header from '../../components/layout/Header'
@@ -11,6 +12,7 @@ import { productStructureService } from '../../services/productStructureService'
 
 function EditProduct() {
   const { user, loading: authLoading } = useAuth()
+  const { showError, showSuccess } = useToast()
   const { theme } = useMarketplaceTheme()
   const navigate = useNavigate()
   const { id } = useParams<{ id: string }>()
@@ -33,7 +35,7 @@ function EditProduct() {
   
   const [loadingProduct, setLoadingProduct] = useState(true)
   const [error, setError] = useState('')
-  const [success, setSuccess] = useState('')
+  const [success] = useState('')
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({})
   const [submitting, setSubmitting] = useState(false)
 
@@ -56,14 +58,13 @@ function EditProduct() {
     
     try {
       setRoleLoading(true)
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (error) throw error
-      setUserRole(data.role)
+      // Utiliser le service de gestion des utilisateurs migré
+      const { userManagementService } = await import('../../services/userManagementServiceWrapper')
+      const userProfile = await userManagementService.getUserById(user.id)
+      
+      if (userProfile) {
+        setUserRole(userProfile.role)
+      }
     } catch (error) {
       console.error('Erreur lors du chargement du rôle:', error)
       setUserRole('client')
@@ -80,6 +81,7 @@ function EditProduct() {
       const product = await productService.getProduct(id)
       
       if (!product) {
+        showError('Produit non trouvé')
         setError('Produit non trouvé')
         return
       }
@@ -107,6 +109,7 @@ function EditProduct() {
 
     } catch (error) {
       console.error('Erreur lors du chargement du produit:', error)
+      showError('Erreur lors du chargement du produit')
       setError('Erreur lors du chargement du produit')
     } finally {
       setLoadingProduct(false)
@@ -151,7 +154,7 @@ function EditProduct() {
         custom_field_values: customFieldValues
       })
 
-      setSuccess('Produit mis à jour avec succès')
+      showSuccess('Produit mis à jour avec succès ! Redirection en cours...')
       setTimeout(() => {
         navigate('/admin/products')
       }, 1500)
@@ -160,7 +163,9 @@ function EditProduct() {
       
       if (error.validationErrors) {
         setValidationErrors(error.validationErrors)
+        showError('Veuillez corriger les erreurs de validation')
       } else {
+        showError(error.message || 'Erreur lors de la mise à jour du produit')
         setError(error.message || 'Erreur lors de la mise à jour du produit')
       }
     } finally {

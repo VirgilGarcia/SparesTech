@@ -1,5 +1,10 @@
-import { supabase } from '../../lib/supabase'
+// ✅ MIGRÉ VERS API BACKEND
+// Ce service utilise maintenant l'API backend pour éviter les problèmes RLS
 
+// Réexport du wrapper qui utilise l'API backend
+export { userManagementService } from './userManagementServiceWrapper'
+
+// Re-export des types pour compatibilité
 export interface CreateUserData {
   email: string
   password: string
@@ -40,7 +45,7 @@ export const userManagementService = {
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
       .insert([{
-        user_id: authUser.user.id,
+        id: authUser.user.id,
         email: userData.email,
         company_name: userData.company_name,
         phone: userData.phone,
@@ -62,7 +67,6 @@ export const userManagementService = {
       .from('user_profiles')
       .select(`
         id,
-        user_id,
         email,
         company_name,
         phone,
@@ -84,7 +88,6 @@ export const userManagementService = {
       .from('user_profiles')
       .select(`
         id,
-        user_id,
         email,
         company_name,
         phone,
@@ -104,7 +107,7 @@ export const userManagementService = {
     const { error } = await supabase
       .from('user_profiles')
       .update({ is_active: isActive })
-      .eq('user_id', userId)
+      .eq('id', userId)
 
     if (error) throw error
   },
@@ -115,7 +118,7 @@ export const userManagementService = {
     const { error } = await supabase
       .from('user_profiles')
       .delete()
-      .eq('user_id', userId)
+      .eq('id', userId)
 
     if (error) throw error
   }

@@ -5,6 +5,7 @@ export interface MarketplaceCreationRequest {
   admin_last_name: string
   admin_email: string
   admin_password: string
+  admin_user_id?: string // ID de l'utilisateur startup propriétaire
   
   // Configuration du marketplace
   subdomain: string
@@ -12,6 +13,15 @@ export interface MarketplaceCreationRequest {
   public_access: boolean
   primary_color?: string
   prospectId?: string
+  
+  // Plan de subscription (optionnel pour appliquer les limites)
+  subscription_plan?: {
+    id: string
+    name: string
+    features: any[]
+    limits: any
+    custom_domain_allowed: boolean
+  }
 }
 
 export interface TenantCreationResult {

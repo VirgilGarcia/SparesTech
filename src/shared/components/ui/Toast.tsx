@@ -91,13 +91,15 @@ export const Toast: React.FC<ToastProps> = ({
   }
 
   return (
-    <div className="fixed top-4 right-4 z-50 max-w-sm w-full">
+    <div className={`transform transition-all duration-300 ease-in-out w-full ${
+      isVisible ? 'translate-x-0 opacity-100' : 'translate-x-full opacity-0'
+    }`}>
       <div className={`rounded-lg p-4 shadow-lg ${colors.bg} ${colors.border} border`}>
         <div className="flex">
           <div className={`flex-shrink-0 ${colors.icon}`}>
             {getIcon()}
           </div>
-          <div className="ml-3">
+          <div className="ml-3 flex-1">
             <p className={`text-sm font-medium ${colors.text}`}>
               {message}
             </p>
