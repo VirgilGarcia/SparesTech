@@ -555,13 +555,11 @@ function AdminCategories() {
 
         {/* Modal de confirmation de suppression */}
         <ConfirmDialog
-          isOpen={categoryToDelete !== null}
-          onCancel={() => setCategoryToDelete(null)}
+          isOpen={!!categoryToDelete}
+          onClose={() => setCategoryToDelete(null)}
           onConfirm={confirmDelete}
           title="Supprimer la catégorie ?"
           message="Cette action est irréversible. Voulez-vous vraiment supprimer cette catégorie ?"
-          confirmText="Supprimer"
-          cancelText="Annuler"
           type="danger"
         />
       </div>

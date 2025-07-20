@@ -1,7 +1,7 @@
 import { supabase } from '../../lib/supabase'
-import { generateOrderNumber } from '../../utils/orderUtils'
-import { getCurrentTenantId } from '../../utils/tenantUtils'
-import type { Order } from '../../types/order'
+import { generateOrderNumber } from '../utils/orderUtils'
+import { getCurrentTenantId } from '../../shared/utils/tenantUtils'
+import type { Order } from '../../shared/types/order'
 
 export const userOrderService = {
   // Récupérer les commandes d'un utilisateur

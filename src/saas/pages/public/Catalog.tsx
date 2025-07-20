@@ -136,13 +136,6 @@ function Catalog() {
       if (selectedCategoryId && categoryTree) {
         // Récupérer SEULEMENT les produits directement tagués dans cette catégorie (pas les sous-catégories)
         categoryIds = [selectedCategoryId]
-        console.log('🔍 Filtrage par catégorie (directe seulement):', {
-          selectedCategoryId,
-          categoryIds,
-          categoryTreeLength: categoryTree.length
-        })
-      } else {
-        console.log('🔍 Pas de catégorie sélectionnée, pas de filtrage')
       }
       const params = {
         page: currentPage,
@@ -153,14 +146,7 @@ function Catalog() {
         sortBy: 'name',
         sortOrder: 'asc' as const
       }
-      console.log('📤 Paramètres envoyés au service:', params)
       const response = await productService.getVisibleProductsPaginated(params)
-      console.log('📥 Réponse du service:', {
-        totalProducts: response.total,
-        productsReturned: response.data.length,
-        currentPage: response.page,
-        totalPages: response.totalPages
-      })
       setProducts(response.data)
       setTotalItems(response.total)
       setTotalPages(response.totalPages)

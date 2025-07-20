@@ -1,6 +1,6 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { tenantService, type Tenant, type UserProfile } from '../services/saas/tenantService'
+import { tenantService, type Tenant, type UserProfile } from '../../saas/services/tenantService'
 
 export function useTenant() {
   const { user } = useAuth()
@@ -9,18 +9,7 @@ export function useTenant() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
 
-  useEffect(() => {
-    if (!user) {
-      setTenant(null)
-      setUserProfile(null)
-      setLoading(false)
-      return
-    }
-
-    loadTenantData()
-  }, [user])
-
-  const loadTenantData = async () => {
+  const loadTenantData = useCallback(async () => {
     if (!user) return
 
     try {
@@ -41,11 +30,22 @@ export function useTenant() {
     } finally {
       setLoading(false)
     }
-  }
+  }, [user])
 
-  const refreshTenant = () => {
+  useEffect(() => {
+    if (!user) {
+      setTenant(null)
+      setUserProfile(null)
+      setLoading(false)
+      return
+    }
+
     loadTenantData()
-  }
+  }, [user, loadTenantData])
+
+  const refreshTenant = useCallback(() => {
+    loadTenantData()
+  }, [loadTenantData])
 
   const updateProfile = async (updates: Partial<UserProfile>) => {
     if (!user || !userProfile) return undefined

@@ -376,12 +376,10 @@ function AdminOrders() {
       {/* Dialog de confirmation */}
       <ConfirmDialog
         isOpen={showDeleteDialog}
-        onCancel={() => setShowDeleteDialog(false)}
+        onClose={() => setShowDeleteDialog(false)}
         onConfirm={handleDeleteConfirm}
         title="Supprimer la commande ?"
         message="Cette action est irréversible. Voulez-vous vraiment supprimer cette commande ?"
-        confirmText="Supprimer"
-        cancelText="Annuler"
         type="danger"
       />
     </div>

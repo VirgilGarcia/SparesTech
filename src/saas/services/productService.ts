@@ -1,7 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import { categoryService } from './categoryService'
-import { tenantService } from './tenantService'
-import { getCurrentTenantId } from '../../utils/tenantUtils'
+import { getCurrentTenantId } from '../../shared/utils/tenantUtils'
 
 
 export interface Product {
@@ -39,6 +38,9 @@ export interface ProductField {
   tenant_id?: string
   created_at: string
   active?: boolean
+  system?: boolean
+  catalog_order?: number
+  product_order?: number
 }
 
 export interface ProductFieldDisplay {
@@ -50,6 +52,8 @@ export interface ProductFieldDisplay {
   show_in_product: boolean
   catalog_order: number
   product_order: number
+  tenant_id?: string
+  active?: boolean
 }
 
 export interface ProductFieldValue {
@@ -92,6 +96,34 @@ export interface PaginatedResponse<T> {
 
 
 export const productService = {
+
+  async getProduct(id: string, tenantId?: string): Promise<Product | null> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    
+    const { data, error } = await supabase
+      .from('products')
+      .select(`
+        *,
+        product_categories (
+          id,
+          category_id,
+          categories (
+            id,
+            name,
+            path
+          )
+        )
+      `)
+      .eq('id', id)
+      .eq('tenant_id', currentTenantId)
+      .single()
+
+    if (error) {
+      if (error.code === 'PGRST116') return null
+      throw error
+    }
+    return data
+  },
 
   async getAllProductsPaginated(params: PaginationParams, tenantId?: string): Promise<PaginatedResponse<Product>> {
     const { 
@@ -242,7 +274,7 @@ export const productService = {
 
     let productIds: string[] | undefined
     if (categoryIds && categoryIds.length > 0) {
-      console.log('🔍 Service: Recherche des produits pour les catégories:', categoryIds)
+      
       
       const { data: productCategoryData, error: pcError } = await supabase
         .from('product_categories')
@@ -252,11 +284,11 @@ export const productService = {
       if (pcError) throw pcError
       productIds = productCategoryData?.map(pc => pc.product_id) || []
       
-      console.log('🔍 Service: Produits trouvés:', productIds.length, 'IDs:', productIds)
+      
       
       // Si aucun produit trouvé pour ces catégories, retourner une réponse vide
       if (productIds.length === 0) {
-        console.log('🔍 Service: Aucun produit trouvé, retour réponse vide')
+
         return {
           data: [],
           total: 0,
@@ -272,7 +304,7 @@ export const productService = {
     let query = supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))', { count: 'exact' })
-      .eq('tenant_id', currentTenantId) // TODO: Réactiver après migration DB
+      .eq('tenant_id', currentTenantId)
       .eq('visible', true)
 
     // Filtres de recherche
@@ -312,13 +344,6 @@ export const productService = {
     }
 
     // Tri et pagination
-    console.log('🔍 Service: Exécution de la requête finale avec filtres:', {
-      productIds: productIds?.length || 0,
-      categoryId,
-      search: !!search,
-      offset,
-      limit
-    })
     const { data, error, count } = await query
       .order(sortBy, { ascending: sortOrder === 'asc' })
       .range(offset, offset + limit - 1)
@@ -327,7 +352,7 @@ export const productService = {
 
     const total = count || 0
     const totalPages = Math.ceil(total / limit)
-    console.log('🔍 Service: Résultat final:', { total, returned: data?.length || 0 })
+
 
     return {
       data: data || [],
@@ -391,7 +416,7 @@ export const productService = {
     const { data, error } = await supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
-      .eq('tenant_id', currentTenantId) // TODO: Réactiver après migration DB
+      .eq('tenant_id', currentTenantId)
       .order('created_at', { ascending: false })
 
     if (error) throw error
@@ -407,7 +432,7 @@ export const productService = {
     const { data, error } = await supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
-      .eq('tenant_id', currentTenantId) // TODO: Réactiver après migration DB
+      .eq('tenant_id', currentTenantId)
       .eq('visible', true)
       .order('created_at', { ascending: false })
 
@@ -425,7 +450,7 @@ export const productService = {
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
       .eq('id', id)
-      .eq('tenant_id', currentTenantId) // TODO: Réactiver après migration DB
+      .eq('tenant_id', currentTenantId)
       .single()
 
     if (error) {
@@ -501,7 +526,7 @@ export const productService = {
       .from('products')
       .update(productUpdates)
       .eq('id', id)
-      .eq('tenant_id', currentTenantId) // TODO: Réactiver après migration DB
+      .eq('tenant_id', currentTenantId)
       .select()
       .single()
 
@@ -528,7 +553,7 @@ export const productService = {
       .from('products')
       .delete()
       .eq('id', id)
-      .eq('tenant_id', currentTenantId) // TODO: Réactiver après migration DB
+      .eq('tenant_id', currentTenantId)
 
     if (error) throw error
   },
@@ -622,7 +647,7 @@ export const productService = {
     let supabaseQuery = supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
-      .eq('tenant_id', currentTenantId) // TODO: Réactiver après migration DB
+      .eq('tenant_id', currentTenantId)
       .eq('visible', true)
       .or(`name.ilike.%${query}%,reference.ilike.%${query}%`)
 
@@ -645,7 +670,7 @@ export const productService = {
     const { data, error } = await supabase
       .from('products')
       .select('*, product_categories(id, category_id, categories(id, name, path))')
-      .eq('tenant_id', currentTenantId) // TODO: Réactiver après migration DB
+      .eq('tenant_id', currentTenantId)
       .eq('visible', true)
       .eq('product_categories.category_id', categoryId)
       .order('name', { ascending: true })

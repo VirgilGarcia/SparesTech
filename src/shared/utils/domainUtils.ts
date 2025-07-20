@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase } from '../../lib/supabase'
 import type { DomainInfo } from '../types/marketplace'
 
 /**
@@ -127,27 +127,33 @@ export async function resolveTenantFromDomain(domainInfo: DomainInfo): Promise<s
     
     // Recherche par sous-domaine
     if (domainInfo.subdomain) {
+      console.log('🔍 Searching for subdomain:', domainInfo.subdomain)
       query = query.eq('subdomain', domainInfo.subdomain)
     }
     // Recherche par domaine personnalisé
     else if (domainInfo.customDomain) {
+      console.log('🔍 Searching for custom domain:', domainInfo.customDomain)
       query = query.eq('custom_domain', domainInfo.customDomain)
     }
     else {
+      console.log('❌ No subdomain or custom domain to search for')
       return null
     }
     
     const { data, error } = await query.single()
     
+    console.log('🔍 Database query result:', { data, error })
+    
     if (error || !data) {
-      console.warn('Aucun tenant trouvé pour le domaine:', domainInfo)
+      console.warn('❌ Aucun tenant trouvé pour le domaine:', domainInfo, 'Error:', error)
       return null
     }
     
+    console.log('✅ Tenant found:', data.tenant_id)
     return data.tenant_id
     
   } catch (error) {
-    console.error('Erreur lors de la résolution du tenant:', error)
+    console.error('❌ Erreur lors de la résolution du tenant:', error)
     return null
   }
 }

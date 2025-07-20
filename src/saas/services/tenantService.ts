@@ -1,67 +1,41 @@
 import { supabase } from '../../lib/supabase'
+import type { Tenant, TenantUser } from '../../shared/types/tenant'
+import type { UserProfile } from '../../shared/types/user'
 
-export interface Tenant {
-  id: string
-  name: string
-  subdomain?: string
-  subscription_status: 'active' | 'inactive' | 'trial'
-  created_at: string
-  updated_at: string
-}
-
-export interface TenantUser {
-  tenant_id: string
-  user_id: string
-  role: 'admin' | 'client'
-  created_at: string
-  tenant?: Tenant
-}
-
-export interface UserProfile {
-  id: string
-  email: string
-  company_name?: string
-  phone?: string
-  address?: string
-  city?: string
-  postal_code?: string
-  country: string
-  role: 'admin' | 'client'
-  is_active: boolean
-  tenant_id?: string
-  created_at: string
-  updated_at: string
-}
+// Réexporter les types pour compatibilité
+export type { Tenant, TenantUser, UserProfile }
 
 export const tenantService = {
   
   // Récupérer le tenant d'un utilisateur
   async getUserTenant(userId: string): Promise<Tenant | null> {
-    // Récupérer d'abord l'association tenant_users
-    const { data: tenantUser, error: userError } = await supabase
-      .from('tenant_users')
-      .select('tenant_id')
-      .eq('user_id', userId)
-      .single()
-    
-    if (userError) {
-      if (userError.code === 'PGRST116') return null // Pas de tenant trouvé
-      throw userError
+    // Contournement temporaire - récupérer le tenant via user_profiles
+    try {
+      const { data: profile } = await supabase
+        .from('user_profiles')
+        .select('tenant_id')
+        .eq('user_id', userId)
+        .single()
+      
+      if (!profile?.tenant_id) return null
+      
+      // Récupérer le tenant
+      const { data: tenant, error: tenantError } = await supabase
+        .from('tenants')
+        .select('*')
+        .eq('id', profile.tenant_id)
+        .single()
+      
+      if (tenantError) {
+        if (tenantError.code === 'PGRST116') return null
+        throw tenantError
+      }
+      
+      return tenant
+    } catch (error) {
+      console.warn('Impossible de récupérer le tenant via user_profiles:', error)
+      return null
     }
-    
-    // Puis récupérer le tenant
-    const { data: tenant, error: tenantError } = await supabase
-      .from('tenants')
-      .select('*')
-      .eq('id', tenantUser.tenant_id)
-      .single()
-    
-    if (tenantError) {
-      if (tenantError.code === 'PGRST116') return null
-      throw tenantError
-    }
-    
-    return tenant
   },
 
   // Récupérer le profil utilisateur avec tenant
@@ -69,7 +43,7 @@ export const tenantService = {
     const { data, error } = await supabase
       .from('user_profiles')
       .select('*')
-      .eq('id', userId)
+      .eq('user_id', userId)
       .single()
     
     if (error) {
@@ -132,7 +106,7 @@ export const tenantService = {
     const { data, error } = await supabase
       .from('user_profiles')
       .insert([{
-        id: profileData.id,
+        user_id: profileData.id,
         email: profileData.email,
         company_name: profileData.company_name,
         phone: profileData.phone,
@@ -159,7 +133,7 @@ export const tenantService = {
         ...updates,
         updated_at: new Date().toISOString()
       })
-      .eq('id', userId)
+      .eq('user_id', userId)
       .select()
       .single()
     

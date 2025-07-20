@@ -2,12 +2,10 @@ import React from 'react'
 
 interface ConfirmDialogProps {
   isOpen: boolean
+  onClose: () => void
+  onConfirm: () => void
   title: string
   message: string
-  confirmText?: string
-  cancelText?: string
-  onConfirm: () => void
-  onCancel: () => void
   type?: 'danger' | 'warning' | 'info'
 }
 
@@ -15,10 +13,8 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   isOpen,
   title,
   message,
-  confirmText = 'Confirmer',
-  cancelText = 'Annuler',
   onConfirm,
-  onCancel,
+  onClose,
   type = 'warning'
 }) => {
   if (!isOpen) return null
@@ -54,7 +50,7 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto">
       <div className="flex min-h-full items-end justify-center p-4 text-center sm:items-center sm:p-0">
-        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onCancel} />
+        <div className="fixed inset-0 bg-gray-500 bg-opacity-75 transition-opacity" onClick={onClose} />
         
         <div className={`relative transform overflow-hidden rounded-lg ${colors.bg} px-4 pb-4 pt-5 text-left shadow-xl transition-all sm:my-8 sm:w-full sm:max-w-lg sm:p-6`}>
           <div className="sm:flex sm:items-start">
@@ -80,14 +76,14 @@ export const ConfirmDialog: React.FC<ConfirmDialogProps> = ({
               className={`inline-flex w-full justify-center rounded-md px-3 py-2 text-sm font-semibold text-white shadow-sm sm:ml-3 sm:w-auto ${colors.button}`}
               onClick={onConfirm}
             >
-              {confirmText}
+              Confirmer
             </button>
             <button
               type="button"
               className="mt-3 inline-flex w-full justify-center rounded-md bg-white px-3 py-2 text-sm font-semibold text-gray-900 shadow-sm ring-1 ring-inset ring-gray-300 hover:bg-gray-50 sm:mt-0 sm:w-auto"
-              onClick={onCancel}
+              onClick={onClose}
             >
-              {cancelText}
+              Annuler
             </button>
           </div>
         </div>

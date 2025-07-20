@@ -1,11 +1,11 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
 import { useMarketplaceTheme } from '../../../shared/context/ThemeContext'
-import type { Product } from '../../services/productService'
+import type { Product, ProductFieldDisplay } from '../../services/productService'
 
 interface ProductCardProps {
   product: Product
-  fieldDisplay?: any[]
+  fieldDisplay?: ProductFieldDisplay[]
   fieldValues?: { [key: string]: string }
   onAddToCart?: (product: Product) => void
   showPrices?: boolean

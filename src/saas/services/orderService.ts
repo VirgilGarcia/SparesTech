@@ -1,6 +1,5 @@
 import { supabase } from '../../lib/supabase'
-import { tenantService } from './tenantService'
-import { getCurrentTenantId } from '../../utils/tenantUtils'
+import { getCurrentTenantId } from '../../shared/utils/tenantUtils'
 
 export interface OrderItem {
   id: number

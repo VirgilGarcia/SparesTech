@@ -1,6 +1,6 @@
-import { productStructureService } from '../services/saas/productStructureService'
-import { productService } from '../services/saas/productService'
-import type { ProductField, ProductFieldDisplay, ProductFieldValueWithField } from '../services/saas/productService'
+import { productStructureService } from '../services/productStructureService'
+import { productService } from '../services/productService'
+import type { ProductField, ProductFieldDisplay, ProductFieldValueWithField } from '../services/productService'
 
 export const fieldUtils = {
   async loadFieldDisplay(): Promise<ProductFieldDisplay[]> {

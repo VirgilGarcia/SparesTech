@@ -45,8 +45,7 @@ function ProductDetail() {
       setLoading(true)
       const data = await productService.getProductById(id!)
       if (data) {
-        console.log('📦 Données produit chargées:', data)
-        console.log('🏷️ Categories du produit:', data.product_categories)
+
         setProduct(data)
       } else {
         setError('Produit non trouvé')
@@ -131,11 +130,11 @@ function ProductDetail() {
   // Fonction helper pour obtenir la catégorie principale d'un produit
   const getMainCategoryId = (product: Product): number | null => {
     if (!product.product_categories || product.product_categories.length === 0) {
-      console.log('🔍 Pas de catégories trouvées pour le produit:', product.name)
+      
       return null
     }
     const categoryId = product.product_categories[0].category_id
-    console.log('🔍 Catégorie principale trouvée:', categoryId, 'pour le produit:', product.name)
+    
     return categoryId
   }
 

@@ -1,6 +1,6 @@
 import { supabase } from '../../lib/supabase'
 import type { ProductField, ProductFieldDisplay } from './productService'
-import { getCurrentTenantId } from '../../utils/tenantUtils'
+import { getCurrentTenantId } from '../../shared/utils/tenantUtils'
 
 export const productStructureService = {
   
@@ -225,7 +225,7 @@ export const productStructureService = {
   },
 
   async reorderFields(updates: { id: string, catalog_order?: number, product_order?: number }[]): Promise<void> {
-    console.log('🔄 reorderFields appelé avec:', updates)
+    
     
     // Mettre à jour chaque champ individuellement pour éviter les problèmes avec upsert
     for (const update of updates) {
@@ -240,9 +240,9 @@ export const productStructureService = {
       }
       
       if (Object.keys(updateData).length > 0) {
-        console.log(`📝 Mise à jour du champ ${update.id} avec:`, updateData)
         
-        const { error, data } = await supabase
+        
+                  const { error } = await supabase
           .from('product_field_display')
           .update(updateData)
           .eq('id', update.id)
@@ -253,13 +253,13 @@ export const productStructureService = {
           throw error
         }
         
-        console.log('✅ Champ mis à jour avec succès:', data)
+        
       } else {
-        console.log('⚠️ Aucune donnée valide à mettre à jour pour:', update)
+
       }
     }
     
-    console.log('🎉 reorderFields terminé avec succès')
+    
   },
 
   async getFieldDisplayById(id: string): Promise<ProductFieldDisplay | null> {
@@ -460,11 +460,11 @@ export const productStructureService = {
       
       // Ne faire la migration que s'il y a des conflits
       if (!hasCatalogConflicts && !hasProductConflicts) {
-        console.log('Aucune migration nécessaire - les ordres sont déjà uniques')
+  
         return
       }
       
-      console.log('Migration nécessaire - correction des ordres en conflit')
+      
       
       // Séparer les champs système et personnalisés
       const systemFields = allFields.filter(f => f.field_type === 'system')
@@ -502,7 +502,7 @@ export const productStructureService = {
         }
       }
       
-      console.log('Migration des ordres terminée avec succès')
+      
     } catch (error) {
       console.error('Erreur lors de la migration des ordres:', error)
       throw error

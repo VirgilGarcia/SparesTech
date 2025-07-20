@@ -40,12 +40,13 @@ export const userManagementService = {
     const { data: profile, error: profileError } = await supabase
       .from('user_profiles')
       .insert([{
-        id: authUser.user.id,
+        user_id: authUser.user.id,
         email: userData.email,
         company_name: userData.company_name,
         phone: userData.phone,
         role: userData.role,
-        tenant_id: userData.tenant_id
+        tenant_id: userData.tenant_id,
+        is_active: true
       }])
       .select()
       .single()
@@ -61,6 +62,7 @@ export const userManagementService = {
       .from('user_profiles')
       .select(`
         id,
+        user_id,
         email,
         company_name,
         phone,
@@ -82,6 +84,7 @@ export const userManagementService = {
       .from('user_profiles')
       .select(`
         id,
+        user_id,
         email,
         company_name,
         phone,
@@ -101,7 +104,7 @@ export const userManagementService = {
     const { error } = await supabase
       .from('user_profiles')
       .update({ is_active: isActive })
-      .eq('id', userId)
+      .eq('user_id', userId)
 
     if (error) throw error
   },
@@ -112,7 +115,7 @@ export const userManagementService = {
     const { error } = await supabase
       .from('user_profiles')
       .delete()
-      .eq('id', userId)
+      .eq('user_id', userId)
 
     if (error) throw error
   }

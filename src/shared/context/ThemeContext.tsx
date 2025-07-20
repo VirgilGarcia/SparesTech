@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react'
 import { useTheme } from '../hooks/useTheme'
-import type { MarketplaceSettings } from '../services/saas/settingsService'
+import type { MarketplaceSettings } from '../../saas/services/settingsService'
 
 interface MarketplaceContextType {
   settings: MarketplaceSettings | null

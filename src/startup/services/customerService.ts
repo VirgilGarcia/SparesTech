@@ -53,9 +53,18 @@ export const startupCustomerService = {
     phone?: string
   }): Promise<StartupCustomer | null> => {
     try {
+      // Pour le workflow startup, on utilise marketplace_prospects
+      // Les vrais comptes utilisateurs seront créés lors du paiement
       const { data, error } = await supabase
-        .from('startup.customers')
-        .insert([customerData])
+        .from('marketplace_prospects')
+        .insert([{
+          email: customerData.email,
+          first_name: customerData.first_name,
+          last_name: customerData.last_name,
+          company_name: customerData.company_name,
+          phone: customerData.phone,
+          status: 'prospect'
+        }])
         .select()
         .single()
 
@@ -73,7 +82,7 @@ export const startupCustomerService = {
   getCustomerById: async (customerId: string): Promise<StartupCustomer | null> => {
     try {
       const { data, error } = await supabase
-        .from('startup.customers')
+        .from('marketplace_prospects')
         .select('*')
         .eq('id', customerId)
         .single()
@@ -92,7 +101,7 @@ export const startupCustomerService = {
   getCustomerByEmail: async (email: string): Promise<StartupCustomer | null> => {
     try {
       const { data, error } = await supabase
-        .from('startup.customers')
+        .from('marketplace_prospects')
         .select('*')
         .eq('email', email)
         .single()
@@ -114,7 +123,7 @@ export const startupCustomerService = {
   ): Promise<StartupCustomer | null> => {
     try {
       const { data, error } = await supabase
-        .from('startup.customers')
+        .from('marketplace_prospects')
         .update({
           ...updates,
           updated_at: new Date().toISOString()
@@ -132,24 +141,38 @@ export const startupCustomerService = {
   },
 
   /**
-   * Lister tous les clients avec pagination
+   * Lister tous les clients
    */
-  getCustomers: async (page: number = 1, pageSize: number = 20): Promise<{
+  listCustomers: async (filters?: {
+    status?: StartupCustomer['status']
+    limit?: number
+    offset?: number
+  }): Promise<{
     customers: StartupCustomer[]
     totalCount: number
   }> => {
     try {
-      const from = (page - 1) * pageSize
-      const to = from + pageSize - 1
-
-      const { data, error, count } = await supabase
-        .from('startup.customers')
+      let query = supabase
+        .from('marketplace_prospects')
         .select('*', { count: 'exact' })
         .order('created_at', { ascending: false })
-        .range(from, to)
+
+      if (filters?.status) {
+        query = query.eq('status', filters.status)
+      }
+
+      if (filters?.limit) {
+        query = query.limit(filters.limit)
+      }
+
+      if (filters?.offset) {
+        query = query.range(filters.offset, filters.offset + (filters.limit || 10) - 1)
+      }
+
+      const { data, error, count } = await query
 
       if (error) throw error
-      
+
       return {
         customers: data || [],
         totalCount: count || 0
@@ -173,24 +196,29 @@ export const startupCustomerService = {
     last_name: string
     phone?: string
     desired_subdomain?: string
-    plan_name?: string
+    selected_plan_id?: string
   }): Promise<{ success: boolean; prospect_id?: string; plan_id?: string; error?: string }> => {
     try {
-      const { data, error } = await supabase.rpc('startup.create_prospect', {
-        p_email: prospectData.email,
-        p_company_name: prospectData.company_name,
-        p_first_name: prospectData.first_name,
-        p_last_name: prospectData.last_name,
-        p_phone: prospectData.phone || null,
-        p_desired_subdomain: prospectData.desired_subdomain || null,
-        p_plan_name: prospectData.plan_name || 'basic'
-      })
+      const { data, error } = await supabase
+        .from('marketplace_prospects')
+        .insert([{
+          email: prospectData.email,
+          first_name: prospectData.first_name,
+          last_name: prospectData.last_name,
+          company_name: prospectData.company_name,
+          phone: prospectData.phone,
+          desired_subdomain: prospectData.desired_subdomain,
+          selected_plan_id: prospectData.selected_plan_id,
+          status: 'prospect'
+        }])
+        .select()
+        .single()
 
       if (error) throw error
-      return data
+      return { success: true, prospect_id: data.id, plan_id: data.selected_plan_id }
     } catch (error) {
       console.error('Erreur lors de la création du prospect:', error)
-      return { success: false, error: error.message }
+      return { success: false, error: (error as Error).message }
     }
   },
 
@@ -200,7 +228,7 @@ export const startupCustomerService = {
   getProspectById: async (prospectId: string): Promise<StartupProspect | null> => {
     try {
       const { data, error } = await supabase
-        .from('startup.prospects')
+        .from('marketplace_prospects')
         .select('*')
         .eq('id', prospectId)
         .single()
@@ -222,7 +250,7 @@ export const startupCustomerService = {
   ): Promise<boolean> => {
     try {
       const { error } = await supabase
-        .from('startup.prospects')
+        .from('marketplace_prospects')
         .update({ 
           status, 
           updated_at: new Date().toISOString() 
@@ -232,67 +260,26 @@ export const startupCustomerService = {
       if (error) throw error
       return true
     } catch (error) {
-      console.error('Erreur lors de la mise à jour du prospect:', error)
+      console.error('Erreur lors de la mise à jour du statut:', error)
       return false
     }
   },
 
   /**
-   * Créer un lead
+   * Lister tous les prospects
    */
-  createLead: async (leadData: {
-    email: string
-    first_name?: string
-    last_name?: string
-    company_name?: string
-    phone?: string
-    source?: string
-    notes?: string
-  }): Promise<StartupLead | null> => {
+  listProspects: async (): Promise<StartupProspect[]> => {
     try {
       const { data, error } = await supabase
-        .from('startup.leads')
-        .insert([leadData])
-        .select()
-        .single()
+        .from('marketplace_prospects')
+        .select('*')
+        .order('created_at', { ascending: false })
 
       if (error) throw error
-      return data
+      return data || []
     } catch (error) {
-      console.error('Erreur lors de la création du lead:', error)
-      return null
-    }
-  },
-
-  /**
-   * Convertir un prospect en client
-   */
-  convertProspectToCustomer: async (prospectId: string): Promise<StartupCustomer | null> => {
-    try {
-      // Récupérer le prospect
-      const prospect = await startupCustomerService.getProspectById(prospectId)
-      if (!prospect) {
-        throw new Error('Prospect non trouvé')
-      }
-
-      // Créer le client
-      const customer = await startupCustomerService.createCustomer({
-        email: prospect.email,
-        first_name: prospect.first_name,
-        last_name: prospect.last_name,
-        company_name: prospect.company_name,
-        phone: prospect.phone || undefined
-      })
-
-      if (customer) {
-        // Mettre à jour le statut du prospect
-        await startupCustomerService.updateProspectStatus(prospectId, 'converted')
-      }
-
-      return customer
-    } catch (error) {
-      console.error('Erreur lors de la conversion:', error)
-      return null
+      console.error('Erreur lors de la récupération des prospects:', error)
+      return []
     }
   },
 
@@ -302,7 +289,7 @@ export const startupCustomerService = {
   searchCustomers: async (query: string): Promise<StartupCustomer[]> => {
     try {
       const { data, error } = await supabase
-        .from('startup.customers')
+        .from('marketplace_prospects')
         .select('*')
         .or(`email.ilike.%${query}%,company_name.ilike.%${query}%,first_name.ilike.%${query}%,last_name.ilike.%${query}%`)
         .order('created_at', { ascending: false })
@@ -316,3 +303,6 @@ export const startupCustomerService = {
     }
   }
 }
+
+// Export d'alias pour la compatibilité
+export const customerService = startupCustomerService

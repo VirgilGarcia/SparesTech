@@ -1,35 +1,43 @@
 import { useState, useEffect } from 'react'
 import { useAuth } from '../../../shared/context/AuthContext'
 import { useMarketplaceTheme } from '../../hooks/useMarketplaceTheme'
+import { useTenant } from '../../../shared/hooks/useTenant'
 import { userProfileService } from '../../services/userProfileService'
 import { errorHandler } from '../../../shared/utils/errorHandler'
 import { Toast } from '../../../shared/components/ui/Toast'
 import Header from '../../components/layout/Header'
+import ProfileForm from '../../components/profile/ProfileForm'
+import PasswordForm from '../../components/profile/PasswordForm'
+import ProfileStats from '../../components/profile/ProfileStats'
 import { 
   UserIcon, 
-  KeyIcon, 
-  BuildingOfficeIcon, 
-  MapPinIcon, 
-  ExclamationTriangleIcon,
-  CheckCircleIcon
+  KeyIcon
 } from '@heroicons/react/24/outline'
 
-import type { UserProfile } from '../../services/userProfileService'
+import type { UserProfile } from '../../../shared/types/user'
 
 function Profile() {
   const { user } = useAuth()
   const { theme } = useMarketplaceTheme()
+  const { tenantId } = useTenant()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
   const [changingPassword, setChangingPassword] = useState(false)
   const [toast, setToast] = useState<{ message: string; type: 'success' | 'error' } | null>(null)
   const [activeTab, setActiveTab] = useState<'profile' | 'password'>('profile')
+  const validationErrors = {}
+  const [showPasswords, setShowPasswords] = useState({
+    current: false,
+    new: false,
+    confirm: false
+  })
 
   // Form state pour les infos personnelles
   const [formData, setFormData] = useState({
-    company_name: '',
+    email: '',
     phone: '',
+    company_name: '',
     address: '',
     city: '',
     postal_code: '',
@@ -38,9 +46,9 @@ function Profile() {
 
   // Form state pour le changement de mot de passe
   const [passwordData, setPasswordData] = useState({
-    currentPassword: '',
-    newPassword: '',
-    confirmPassword: ''
+    current_password: '',
+    new_password: '',
+    confirm_password: ''
   })
 
   useEffect(() => {
@@ -52,13 +60,14 @@ function Profile() {
   const loadProfile = async () => {
     try {
       setLoading(true)
-      const data = await userProfileService.getProfile(user!.id)
+      const data = await userProfileService.getProfile(user!.id, tenantId || undefined)
 
       if (data) {
         setProfile(data)
         setFormData({
-          company_name: data.company_name || '',
+          email: data.email || '',
           phone: data.phone || '',
+          company_name: data.company_name || '',
           address: data.address || '',
           city: data.city || '',
           postal_code: data.postal_code || '',
@@ -80,13 +89,13 @@ function Profile() {
       setSaving(true)
       
       await userProfileService.updateProfile(user!.id, {
-        company_name: formData.company_name || null,
         phone: formData.phone || null,
+        company_name: formData.company_name || null,
         address: formData.address || null,
         city: formData.city || null,
         postal_code: formData.postal_code || null,
-        country: formData.country || 'France'
-      })
+        country: formData.country || null
+      }, tenantId || undefined)
 
       setToast({ message: 'Profil mis à jour avec succès !', type: 'success' })
       await loadProfile()
@@ -101,12 +110,12 @@ function Profile() {
   const handleChangePassword = async (e: React.FormEvent) => {
     e.preventDefault()
     
-    if (passwordData.newPassword !== passwordData.confirmPassword) {
+    if (passwordData.new_password !== passwordData.confirm_password) {
       setToast({ message: 'Les mots de passe ne correspondent pas', type: 'error' })
       return
     }
 
-    if (passwordData.newPassword.length < 6) {
+    if (passwordData.new_password.length < 6) {
       setToast({ message: 'Le mot de passe doit contenir au moins 6 caractères', type: 'error' })
       return
     }
@@ -114,13 +123,13 @@ function Profile() {
     try {
       setChangingPassword(true)
       
-      await userProfileService.changePassword(passwordData.newPassword)
+      await userProfileService.changePassword(passwordData.new_password)
 
       setToast({ message: 'Mot de passe modifié avec succès !', type: 'success' })
       setPasswordData({
-        currentPassword: '',
-        newPassword: '',
-        confirmPassword: ''
+        current_password: '',
+        new_password: '',
+        confirm_password: ''
       })
     } catch (error) {
       const message = errorHandler.getErrorMessage(error)
@@ -128,6 +137,18 @@ function Profile() {
     } finally {
       setChangingPassword(false)
     }
+  }
+
+  const handleInputChange = (field: string, value: string) => {
+    setFormData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handlePasswordChange = (field: string, value: string) => {
+    setPasswordData(prev => ({ ...prev, [field]: value }))
+  }
+
+  const handleTogglePassword = (field: 'current' | 'new' | 'confirm') => {
+    setShowPasswords(prev => ({ ...prev, [field]: !prev[field] }))
   }
 
   const formatDate = (dateString: string) => {
@@ -254,276 +275,39 @@ function Profile() {
 
           {/* Contenu principal */}
           <div className="lg:col-span-3">
-            <div className="bg-white rounded-lg border border-gray-100">
-              
+            <div className="space-y-6">
+              {/* Statistiques du profil */}
+              {profile && (
+                <ProfileStats
+                  profile={profile}
+                />
+              )}
+
               {/* Onglet Informations personnelles */}
               {activeTab === 'profile' && (
-                <div className="p-6">
-                  <div className="mb-8">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <div className="p-2 rounded-lg" style={{ backgroundColor: `${theme.primaryColor}15` }}>
-                        <UserIcon className="h-5 w-5" style={{ color: theme.primaryColor }} />
-                      </div>
-                      <h2 className="text-xl font-medium text-gray-900">Informations personnelles</h2>
-                    </div>
-                    <p className="text-gray-600">Mettez à jour vos informations de contact et d'adresse</p>
-                  </div>
-
-                  <form onSubmit={handleSaveProfile} className="space-y-6">
-                    
-                    {/* Informations de base */}
-                    <div>
-                      <div className="flex items-center space-x-2 mb-4">
-                        <BuildingOfficeIcon className="h-5 w-5 text-gray-400" />
-                        <h3 className="font-medium text-gray-900">Informations de base</h3>
-                      </div>
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Email
-                          </label>
-                          <input
-                            type="email"
-                            value={profile?.email || ''}
-                            disabled
-                            className="w-full px-4 py-3 border border-gray-200 rounded-lg bg-gray-50 text-gray-500"
-                          />
-                          <p className="text-xs text-gray-500 mt-1">L'email ne peut pas être modifié</p>
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Nom de l'entreprise
-                          </label>
-                          <input
-                            type="text"
-                            value={formData.company_name}
-                            onChange={(e) => setFormData(prev => ({ ...prev, company_name: e.target.value }))}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                            style={{ 
-                              borderColor: theme.primaryColor + '40'
-                            }}
-                            placeholder="Nom de votre entreprise"
-                          />
-                        </div>
-
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Téléphone
-                          </label>
-                          <input
-                            type="tel"
-                            value={formData.phone}
-                            onChange={(e) => setFormData(prev => ({ ...prev, phone: e.target.value }))}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                            style={{ 
-                              borderColor: theme.primaryColor + '40'
-                            }}
-                            placeholder="01 23 45 67 89"
-                          />
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Adresse */}
-                    <div>
-                      <div className="flex items-center space-x-2 mb-4">
-                        <MapPinIcon className="h-5 w-5 text-gray-400" />
-                        <h3 className="font-medium text-gray-900">Adresse de livraison</h3>
-                      </div>
-                      <div className="space-y-4">
-                        <div>
-                          <label className="block text-sm font-medium text-gray-700 mb-2">
-                            Adresse
-                          </label>
-                          <textarea
-                            value={formData.address}
-                            onChange={(e) => setFormData(prev => ({ ...prev, address: e.target.value }))}
-                            rows={3}
-                            className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                            style={{ 
-                              borderColor: theme.primaryColor + '40'
-                            }}
-                            placeholder="123 rue de la Paix, Bâtiment A, Appartement 4B"
-                          />
-                        </div>
-
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Ville
-                            </label>
-                            <input
-                              type="text"
-                              value={formData.city}
-                              onChange={(e) => setFormData(prev => ({ ...prev, city: e.target.value }))}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                              style={{ 
-                                borderColor: theme.primaryColor + '40'
-                              }}
-                              placeholder="Paris"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Code postal
-                            </label>
-                            <input
-                              type="text"
-                              value={formData.postal_code}
-                              onChange={(e) => setFormData(prev => ({ ...prev, postal_code: e.target.value }))}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                              style={{ 
-                                borderColor: theme.primaryColor + '40'
-                              }}
-                              placeholder="75001"
-                            />
-                          </div>
-
-                          <div>
-                            <label className="block text-sm font-medium text-gray-700 mb-2">
-                              Pays
-                            </label>
-                            <select
-                              value={formData.country}
-                              onChange={(e) => setFormData(prev => ({ ...prev, country: e.target.value }))}
-                              className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                              style={{ 
-                                borderColor: theme.primaryColor + '40'
-                              }}
-                            >
-                              <option value="France">France</option>
-                              <option value="Belgique">Belgique</option>
-                              <option value="Suisse">Suisse</option>
-                              <option value="Canada">Canada</option>
-                              <option value="Autre">Autre</option>
-                            </select>
-                          </div>
-                        </div>
-                      </div>
-                    </div>
-
-                    {/* Bouton de sauvegarde */}
-                    <div className="flex justify-end pt-6 border-t border-gray-100">
-                      <button
-                        type="submit"
-                        disabled={saving}
-                        className="flex items-center space-x-2 px-6 py-3 text-white font-medium rounded-lg transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ backgroundColor: theme.primaryColor }}
-                      >
-                        {saving ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            <span>Sauvegarde...</span>
-                          </>
-                        ) : (
-                          <>
-                            <CheckCircleIcon className="h-5 w-5" />
-                            <span>Sauvegarder les modifications</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                </div>
+                <ProfileForm
+                  formData={formData}
+                  onInputChange={handleInputChange}
+                  onSubmit={handleSaveProfile}
+                  loading={saving}
+                  validationErrors={validationErrors}
+                  canEditEmail={false}
+                  theme={theme}
+                />
               )}
 
               {/* Onglet Mot de passe */}
               {activeTab === 'password' && (
-                <div className="p-6">
-                  <div className="mb-8">
-                    <div className="flex items-center space-x-3 mb-3">
-                      <div className="p-2 bg-red-50 rounded-lg">
-                        <KeyIcon className="h-5 w-5 text-red-600" />
-                      </div>
-                      <h2 className="text-xl font-medium text-gray-900">Changer le mot de passe</h2>
-                    </div>
-                    <p className="text-gray-600">Assurez-vous d'utiliser un mot de passe sécurisé</p>
-                  </div>
-
-                  <form onSubmit={handleChangePassword} className="space-y-6 max-w-md">
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Nouveau mot de passe
-                      </label>
-                      <input
-                        type="password"
-                        value={passwordData.newPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, newPassword: e.target.value }))}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                        style={{ 
-                          borderColor: theme.primaryColor + '40'
-                        }}
-                        placeholder="Nouveau mot de passe"
-                        minLength={6}
-                        required
-                      />
-                    </div>
-
-                    <div>
-                      <label className="block text-sm font-medium text-gray-700 mb-2">
-                        Confirmer le nouveau mot de passe
-                      </label>
-                      <input
-                        type="password"
-                        value={passwordData.confirmPassword}
-                        onChange={(e) => setPasswordData(prev => ({ ...prev, confirmPassword: e.target.value }))}
-                        className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-offset-0 transition-all"
-                        style={{ 
-                          borderColor: theme.primaryColor + '40'
-                        }}
-                        placeholder="Confirmer le mot de passe"
-                        minLength={6}
-                        required
-                      />
-                    </div>
-
-                    <div className="bg-yellow-50 border border-yellow-200 rounded-lg p-4">
-                      <div className="flex">
-                        <ExclamationTriangleIcon className="w-5 h-5 text-yellow-600 mr-3 mt-0.5 flex-shrink-0" />
-                        <div>
-                          <p className="text-yellow-800 font-medium mb-2">Conseils pour un mot de passe sécurisé :</p>
-                          <ul className="text-yellow-700 text-sm space-y-1">
-                            <li className="flex items-center space-x-2">
-                              <div className="w-1 h-1 bg-yellow-500 rounded-full"></div>
-                              <span>Au moins 8 caractères</span>
-                            </li>
-                            <li className="flex items-center space-x-2">
-                              <div className="w-1 h-1 bg-yellow-500 rounded-full"></div>
-                              <span>Mélange de lettres majuscules et minuscules</span>
-                            </li>
-                            <li className="flex items-center space-x-2">
-                              <div className="w-1 h-1 bg-yellow-500 rounded-full"></div>
-                              <span>Inclure des chiffres et des symboles</span>
-                            </li>
-                          </ul>
-                        </div>
-                      </div>
-                    </div>
-
-                    <div className="flex justify-end pt-6 border-t border-gray-100">
-                      <button
-                        type="submit"
-                        disabled={changingPassword}
-                        className="flex items-center space-x-2 px-6 py-3 text-white font-medium rounded-lg transition-all hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed"
-                        style={{ backgroundColor: theme.primaryColor }}
-                      >
-                        {changingPassword ? (
-                          <>
-                            <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                            <span>Modification...</span>
-                          </>
-                        ) : (
-                          <>
-                            <KeyIcon className="h-5 w-5" />
-                            <span>Changer le mot de passe</span>
-                          </>
-                        )}
-                      </button>
-                    </div>
-                  </form>
-                </div>
+                <PasswordForm
+                  formData={passwordData}
+                  onInputChange={handlePasswordChange}
+                  onSubmit={handleChangePassword}
+                  loading={changingPassword}
+                  validationErrors={validationErrors}
+                  showPasswords={showPasswords}
+                  onTogglePassword={handleTogglePassword}
+                  theme={theme}
+                />
               )}
             </div>
           </div>

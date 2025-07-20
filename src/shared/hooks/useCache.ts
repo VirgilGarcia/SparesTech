@@ -1,4 +1,4 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 
 interface CacheItem<T> {
   data: T
@@ -13,7 +13,7 @@ interface CacheOptions {
 
 export function useCache<T>(
   fetchFunction: () => Promise<T>,
-  dependencies: any[] = [],
+  dependencies: unknown[] = [],
   options: CacheOptions = {}
 ) {
   const [data, setData] = useState<T | null>(null)
@@ -28,21 +28,21 @@ export function useCache<T>(
     return Date.now() - item.timestamp < item.ttl
   }
 
-  const getCachedData = (): T | null => {
+  const getCachedData = useCallback((): T | null => {
     const cached = cacheRef.current.get(cacheKey)
     if (cached && isCacheValid(cached)) {
       return cached.data
     }
     return null
-  }
+  }, [cacheKey])
 
-  const setCachedData = (newData: T) => {
+  const setCachedData = useCallback((newData: T) => {
     cacheRef.current.set(cacheKey, {
       data: newData,
       timestamp: Date.now(),
       ttl
     })
-  }
+  }, [cacheKey, ttl])
 
   const clearCache = () => {
     cacheRef.current.clear()
@@ -78,7 +78,7 @@ export function useCache<T>(
     }
 
     fetchData()
-  }, dependencies)
+  }, [fetchFunction, getCachedData, setCachedData, ...dependencies])
 
   return {
     data,

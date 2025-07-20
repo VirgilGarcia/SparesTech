@@ -1,3 +1,67 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+/* Animations pour la homepage */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+.animate-fade-in-up {
+  animation: fadeInUp 0.8s ease-out forwards;
+}
+
+.animation-delay-200 {
+  animation-delay: 200ms;
+}
+
+.animation-delay-400 {
+  animation-delay: 400ms;
+}
+
+/* Pattern de fond */
+.bg-grid-pattern {
+  background-image: radial-gradient(circle, #e5e7eb 1px, transparent 1px);
+  background-size: 20px 20px;
+}
+
+/* Smooth scrolling */
+html {
+  scroll-behavior: smooth;
+}
+
+/* Hover effects améliorés */
+.group:hover .group-hover\:scale-110 {
+  transform: scale(1.1);
+}
+
+.group:hover .group-hover\:bg-blue-200 {
+  background-color: #dbeafe;
+}
+
+.group:hover .group-hover\:bg-purple-200 {
+  background-color: #e9d5ff;
+}
+
+.group:hover .group-hover\:bg-green-200 {
+  background-color: #dcfce7;
+}
+
+.group:hover .group-hover\:bg-amber-200 {
+  background-color: #fef3c7;
+}
+
+.group:hover .group-hover\:bg-indigo-200 {
+  background-color: #e0e7ff;
+}
+
+.group:hover .group-hover\:bg-pink-200 {
+  background-color: #fce7f3;
+}

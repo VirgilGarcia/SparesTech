@@ -1,6 +1,6 @@
 import { createContext, useContext, useState } from 'react'
 import type { ReactNode } from 'react'
-import type { Product } from '../services/saas/productService'
+import type { Product } from '../../saas/services/productService'
 
 interface CartItem extends Product {
   quantity: number
@@ -87,4 +87,4 @@ export function useCart() {
 }
 
 // Export du type Product depuis le service
-export type { Product } from '../services/saas/productService'
+export type { Product } from '../../saas/services/productService'

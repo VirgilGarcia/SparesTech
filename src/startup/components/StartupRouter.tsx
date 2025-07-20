@@ -1,15 +1,28 @@
 import React from 'react'
-import { Routes, Route } from 'react-router-dom'
+import { Routes, Route, Navigate } from 'react-router-dom'
 import Homepage from '../pages/Homepage'
-import SubscriptionPlans from '../pages/SubscriptionPlans'
 import MarketplaceCheckout from '../pages/MarketplaceCheckout'
+import Pricing from '../pages/Pricing'
+import Demo from '../pages/Demo'
+import Login from '../pages/Login'
+import Register from '../pages/Register'
+import Profile from '../pages/Profile'
+import FAQ from '../pages/FAQ'
 
 const StartupRouter: React.FC = () => {
   return (
     <Routes>
       <Route path="/" element={<Homepage />} />
-      <Route path="/plans" element={<SubscriptionPlans />} />
-      <Route path="/checkout" element={<MarketplaceCheckout />} />
+      <Route path="/demo" element={<Demo />} />
+      <Route path="/pricing" element={<Pricing />} />
+      <Route path="/faq" element={<FAQ />} />
+      <Route path="/checkout" element={<Navigate to="/marketplace-checkout" replace />} />
+      <Route path="/marketplace-checkout" element={<MarketplaceCheckout />} />
+      <Route path="/login" element={<Login />} />
+      <Route path="/register" element={<Register />} />
+      <Route path="/profile" element={<Profile />} />
+      <Route path="/plans" element={<Navigate to="/pricing" replace />} />
+      <Route path="*" element={<Navigate to="/" replace />} />
     </Routes>
   )
 }

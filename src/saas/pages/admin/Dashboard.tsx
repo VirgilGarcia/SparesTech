@@ -5,7 +5,6 @@ import { Navigate, Link } from 'react-router-dom'
 import { productService } from '../../services/productService'
 import { orderService } from '../../services/orderService'
 import { categoryService } from '../../services/categoryService'
-import { supabase } from '../../../lib/supabase'
 import Header from '../../components/layout/Header'
 import { productStructureService } from '../../services/productStructureService'
 import { useMarketplaceTheme } from '../../hooks/useMarketplaceTheme'
@@ -22,7 +21,7 @@ function AdminDashboard() {
   const { tenantId, userProfile, loading: tenantLoading, isAdmin } = useTenantContext()
   const { theme } = useMarketplaceTheme()
   const [userRole, setUserRole] = useState<string | null>(null)
-  const [roleLoading, setRoleLoading] = useState(false)
+  const [roleLoading] = useState(false)
   const [weeklyOrders, setWeeklyOrders] = useState<number[]>([0,0,0,0,0,0,0])
   const [monthlyStats, setMonthlyStats] = useState({
     productsCount: 0,

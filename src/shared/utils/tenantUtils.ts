@@ -1,13 +1,23 @@
-import { supabase } from '../lib/supabase'
-import { tenantService } from '../services/saas/tenantService'
+import { supabase } from '../../lib/supabase'
 
 // Fonction utilitaire pour obtenir le tenant de l'utilisateur courant
 export async function getCurrentTenantId(): Promise<string | null> {
   const { data: { user } } = await supabase.auth.getUser()
   if (!user) return null
   
-  const tenant = await tenantService.getUserTenant(user.id)
-  return tenant?.id || null
+  // Récupérer le tenant via user_profiles
+  try {
+    const { data: profile } = await supabase
+      .from('user_profiles')
+      .select('tenant_id')
+      .eq('user_id', user.id)
+      .single()
+    
+    return profile?.tenant_id || null
+  } catch (error) {
+    console.warn('Impossible de récupérer le tenant_id depuis user_profiles:', error)
+    return null
+  }
 }
 
 // Fonction utilitaire pour gérer les opérations tenant-aware

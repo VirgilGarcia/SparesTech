@@ -35,49 +35,51 @@ export const errorHandler = {
       return { message: this.userFriendlyErrors.UNKNOWN_ERROR }
     }
 
+    const errorObj = error as SupabaseError
+
     // Erreurs d'authentification
-    if (error.message?.includes('Invalid login credentials')) {
+    if (errorObj.message?.includes('Invalid login credentials')) {
       return { message: this.userFriendlyErrors.AUTH_INVALID_CREDENTIALS }
     }
 
-    if (error.message?.includes('User not found')) {
+    if (errorObj.message?.includes('User not found')) {
       return { message: this.userFriendlyErrors.AUTH_USER_NOT_FOUND }
     }
 
-    if (error.message?.includes('Password should be at least')) {
+    if (errorObj.message?.includes('Password should be at least')) {
       return { message: this.userFriendlyErrors.AUTH_WEAK_PASSWORD }
     }
 
-    if (error.message?.includes('already registered')) {
+    if (errorObj.message?.includes('already registered')) {
       return { message: this.userFriendlyErrors.AUTH_EMAIL_ALREADY_IN_USE }
     }
 
-    if (error.message?.includes('Too many requests')) {
+    if (errorObj.message?.includes('Too many requests')) {
       return { message: this.userFriendlyErrors.AUTH_TOO_MANY_REQUESTS }
     }
 
     // Erreurs de réseau
-    if (error.message?.includes('fetch') || error.message?.includes('network')) {
+    if (errorObj.message?.includes('fetch') || errorObj.message?.includes('network')) {
       return { message: this.userFriendlyErrors.NETWORK_ERROR }
     }
 
     // Erreurs de permissions
-    if (error.code === 'PGRST301' || error.message?.includes('permission')) {
+    if (errorObj.code === 'PGRST301' || errorObj.message?.includes('permission')) {
       return { message: this.userFriendlyErrors.PERMISSION_DENIED }
     }
 
     // Erreurs de validation
-    if (error.code === 'PGRST116' || error.message?.includes('validation')) {
+    if (errorObj.code === 'PGRST116' || errorObj.message?.includes('validation')) {
       return { message: this.userFriendlyErrors.VALIDATION_ERROR }
     }
 
     // Erreurs 404
-    if (error.code === 'PGRST116' || error.message?.includes('not found')) {
+    if (errorObj.code === 'PGRST116' || errorObj.message?.includes('not found')) {
       return { message: this.userFriendlyErrors.NOT_FOUND }
     }
 
     // Erreurs serveur
-    if (error.code?.startsWith('PGRST') || error.status >= 500) {
+    if (errorObj.code?.startsWith('PGRST') || (errorObj.status && errorObj.status >= 500)) {
       return { message: this.userFriendlyErrors.SERVER_ERROR }
     }
 

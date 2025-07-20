@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../../shared/context/AuthContext'
 import { useMarketplaceTheme } from '../../../shared/context/ThemeContext'
@@ -15,30 +15,7 @@ function Header() {
   const [showMobileMenu, setShowMobileMenu] = useState(false)
   const [userRole, setUserRole] = useState<string | null>(null)
 
-  // Charger le rôle de l'utilisateur quand il se connecte
-  useEffect(() => {
-    if (user) {
-      loadUserRole()
-    } else {
-      setUserRole(null)
-    }
-  }, [user])
-
-  // Charger les catégories
-  useEffect(() => {
-    loadCategories()
-  }, [])
-
-  const loadCategories = async () => {
-    try {
-      await categoryService.getAllCategories()
-    } catch (error) {
-      console.error('Erreur lors du chargement des catégories:', error)
-    } finally {
-    }
-  }
-
-  const loadUserRole = async () => {
+  const loadUserRole = useCallback(async () => {
     if (!user) return
     
     try {
@@ -57,9 +34,30 @@ function Header() {
     } catch (error) {
       console.error('Erreur lors du chargement du rôle:', error)
       setUserRole('client')
-    } finally {
+    }
+  }, [user])
+
+  const loadCategories = async () => {
+    try {
+      await categoryService.getAllCategories()
+    } catch (error) {
+      console.error('Erreur lors du chargement des catégories:', error)
     }
   }
+
+  // Charger le rôle de l'utilisateur quand il se connecte
+  useEffect(() => {
+    if (user) {
+      loadUserRole()
+    } else {
+      setUserRole(null)
+    }
+  }, [user, loadUserRole])
+
+  // Charger les catégories
+  useEffect(() => {
+    loadCategories()
+  }, [])
 
   const handleLogout = async () => {
     try {

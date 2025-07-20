@@ -59,7 +59,7 @@ export const validation = {
   },
 
   validatePhone: (phone: string): boolean => {
-    const phoneRegex = /^[\+]?[0-9\s\-\(\)]{10,15}$/
+    const phoneRegex = /^[+]?[0-9\s\-()]{10,15}$/
     return phoneRegex.test(phone)
   },
 

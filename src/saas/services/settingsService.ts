@@ -1,7 +1,7 @@
 
 
 import { supabase } from '../../lib/supabase'
-import { getCurrentTenantId } from '../../utils/tenantUtils'
+import { getCurrentTenantId } from '../../shared/utils/tenantUtils'
 
 export interface MarketplaceSettings {
   id?: string
@@ -176,5 +176,63 @@ export const settingsService = {
       console.error('Erreur lors de la vérification de configuration:', error)
       return false
     }
+  },
+
+  async uploadLogo(file: File, tenantId?: string): Promise<string> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    
+    // Générer un nom de fichier unique
+    const fileExt = file.name.split('.').pop()
+    const fileName = `${currentTenantId}/logo-${Date.now()}.${fileExt}`
+    
+    // Upload du fichier
+    const { error } = await supabase.storage
+      .from('marketplace-assets')
+      .upload(fileName, file, {
+        cacheControl: '3600',
+        upsert: false
+      })
+    
+    if (error) throw error
+    
+    // Récupérer l'URL publique
+    const { data: publicURL } = supabase.storage
+      .from('marketplace-assets')
+      .getPublicUrl(fileName)
+    
+    if (!publicURL) throw new Error('Impossible de récupérer l\'URL du logo')
+    
+    // Mettre à jour les paramètres avec la nouvelle URL du logo
+    await this.updateSettings(currentTenantId!, {
+      logo_url: publicURL.publicUrl
+    })
+    
+    return publicURL.publicUrl
+  },
+
+  async removeLogo(tenantId?: string): Promise<void> {
+    const currentTenantId = tenantId || await getCurrentTenantId()
+    
+    // Récupérer l'URL actuelle du logo
+    const settings = await this.getSettings(currentTenantId!)
+    
+    if (settings?.logo_url) {
+      // Extraire le nom du fichier de l'URL
+      const fileName = settings.logo_url.split('/').pop()
+      
+      if (fileName) {
+        // Supprimer le fichier du storage
+        const { error } = await supabase.storage
+          .from('marketplace-assets')
+          .remove([`${currentTenantId}/${fileName}`])
+        
+        if (error) console.error('Erreur lors de la suppression du fichier:', error)
+      }
+    }
+    
+    // Mettre à jour les paramètres pour supprimer l'URL du logo
+    await this.updateSettings(currentTenantId!, {
+      logo_url: null
+    })
   }
 }

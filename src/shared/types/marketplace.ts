@@ -11,6 +11,7 @@ export interface MarketplaceCreationRequest {
   custom_domain?: string
   public_access: boolean
   primary_color?: string
+  prospectId?: string
 }
 
 export interface TenantCreationResult {
@@ -19,7 +20,11 @@ export interface TenantCreationResult {
   marketplace_url: string
   admin_login_url: string
   success: boolean
+  error?: string
   errors?: string[]
+  url?: string
+  company_name?: string
+  admin_email?: string
 }
 
 export interface DomainInfo {

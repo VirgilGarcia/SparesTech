@@ -38,7 +38,7 @@ function Register() {
     }
 
     try {
-      await signUp(formData.email, formData.password, formData.company)
+      await signUp(formData.email, formData.password, { company: formData.company })
       setSuccess(true)
       setTimeout(() => navigate('/login'), 3000)
     } catch (err: any) {

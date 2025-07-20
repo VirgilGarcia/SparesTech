@@ -1,6 +1,7 @@
 import { supabase } from '../../lib/supabase'
 import { startupCustomerService } from './customerService'
 import { startupSubscriptionService } from './subscriptionService'
+import { getOrCreateStartupUserProfile } from './userProfileService'
 import type { MarketplaceCreationRequest as SharedMarketplaceCreationRequest } from '../../shared/types/marketplace'
 
 export interface MarketplaceCreationResult {
@@ -38,8 +39,9 @@ export const startupMarketplaceService = {
     phone?: string
     desired_subdomain?: string
     selected_plan_id?: string
-  }): Promise<{ id: string } | null> => {
+  }): Promise<{ id: string; error?: string } | null> => {
     try {
+      // D'abord, essayer d'insérer un nouveau prospect
       const { data, error } = await supabase
         .from('marketplace_prospects')
         .insert([{
@@ -55,10 +57,147 @@ export const startupMarketplaceService = {
         .select('id')
         .single()
 
-      if (error) throw error
+      if (error) {
+        // Gestion des erreurs de contraintes
+        if (error.code === '23505') {
+          if (error.message.includes('email')) {
+            // L'email existe déjà, récupérer l'enregistrement existant
+            // Un utilisateur peut créer plusieurs marketplaces avec le même email
+            const { data: existingProspect, error: selectError } = await supabase
+              .from('marketplace_prospects')
+              .select('id')
+              .eq('email', prospectData.email)
+              .single()
+            
+            if (selectError) {
+              console.error('Erreur lors de la récupération du prospect existant:', selectError)
+              return { id: '', error: 'Erreur technique lors de la création du prospect' }
+            }
+            
+            return existingProspect
+          }
+          if (error.message.includes('company_name')) {
+            return { id: '', error: 'Ce nom d\'entreprise est déjà pris' }
+          }
+          if (error.message.includes('desired_subdomain')) {
+            return { id: '', error: 'Ce sous-domaine est déjà pris' }
+          }
+        }
+        throw error
+      }
+      
       return data
     } catch (error) {
       console.error('Erreur lors de la création du prospect:', error)
+      return { id: '', error: 'Erreur technique lors de la création du prospect' }
+    }
+  },
+
+  /**
+   * Créer un marketplace en mode développement (sans paiement)
+   */
+  createMarketplaceDev: async (requestData: {
+    prospectId?: string
+    company_name: string
+    admin_first_name: string
+    admin_last_name: string
+    admin_email: string
+    admin_password: string
+    subdomain?: string
+    custom_domain?: string
+    public_access: boolean
+    primary_color?: string
+    plan_id: string
+    billing_cycle: 'monthly' | 'yearly'
+    user_id: string // ID de l'utilisateur connecté
+  }): Promise<{ url?: string; company_name?: string; admin_email?: string } | null> => {
+    try {
+      // Utiliser le sous-domaine fourni ou générer un sous-domaine temporaire
+      let subdomain = requestData.subdomain
+      if (!subdomain) {
+        const randomSuffix = Math.random().toString(36).substring(2, 8)
+        subdomain = `dev-${requestData.company_name.toLowerCase().replace(/[^a-z0-9]/g, '')}-${randomSuffix}`
+      }
+      
+      // 1. Créer le marketplace directement (mode dev)
+      const marketplace = await startupMarketplaceService.createMarketplace({
+        company_name: requestData.company_name,
+        admin_first_name: requestData.admin_first_name,
+        admin_last_name: requestData.admin_last_name,
+        admin_email: requestData.admin_email,
+        admin_password: requestData.admin_password,
+        subdomain: subdomain,
+        custom_domain: requestData.custom_domain,
+        public_access: requestData.public_access,
+        primary_color: requestData.primary_color || '#10b981'
+      })
+      
+      if (!marketplace?.success || !marketplace.tenant_id) {
+        return null
+      }
+
+      // 2. Créer le customer (startup)
+      const customer = await startupCustomerService.createCustomer({
+        email: requestData.admin_email,
+        first_name: requestData.admin_first_name,
+        last_name: requestData.admin_last_name,
+        company_name: requestData.company_name,
+        phone: ''
+      })
+
+      if (!customer) {
+        return null
+      }
+
+              // 3. Créer la subscription
+        const subscription = await startupSubscriptionService.createSubscription({
+          customer_id: customer.id,
+          plan_id: requestData.plan_id,
+          tenant_id: marketplace.tenant_id,
+          billing_cycle: requestData.billing_cycle
+        })
+
+      if (!subscription) {
+        return null
+      }
+
+      // 4. Créer ou mettre à jour le profil startup de l'utilisateur
+      try {
+        await getOrCreateStartupUserProfile(requestData.user_id, {
+          email: requestData.admin_email,
+          first_name: requestData.admin_first_name,
+          last_name: requestData.admin_last_name,
+          company_name: requestData.company_name
+        })
+      } catch (profileError) {
+        console.error('Erreur lors de la création du profil startup:', profileError)
+      }
+
+      // 5. Créer le user_profile admin pour le tenant SaaS
+      const { error: tenantProfileError } = await supabase
+        .from('user_profiles')
+        .insert([{
+          user_id: requestData.user_id,
+          tenant_id: marketplace.tenant_id,
+          first_name: requestData.admin_first_name,
+          last_name: requestData.admin_last_name,
+          email: requestData.admin_email,
+          role: 'admin',
+          is_active: true
+        }])
+
+      if (tenantProfileError) {
+        console.error('Erreur lors de la création du profil admin tenant:', tenantProfileError)
+      }
+
+      return {
+        url: `http://localhost:5174?tenant=${subdomain}`,
+        company_name: requestData.company_name,
+        admin_email: requestData.admin_email
+      }
+      
+    } catch (error) {
+      console.error('Erreur lors de la création du marketplace dev:', error)
       return null
     }
   },
@@ -118,21 +257,18 @@ export const startupMarketplaceService = {
    */
   checkSubdomainAvailability: async (subdomain: string): Promise<boolean> => {
     try {
-      const { error } = await supabase
-        .from('public.tenants')
+      const { data, error } = await supabase
+        .from('tenants')
         .select('id')
         .eq('subdomain', subdomain.toLowerCase())
-        .single()
+        .maybeSingle()
 
-      if (error && error.code === 'PGRST116') {
-        // Pas de résultat = disponible
-        return true
+      if (error && error.code !== 'PGRST116') {
+        throw error
       }
 
-      if (error) throw error
-      
-      // Sous-domaine déjà pris
-      return false
+      // Si data existe, sous-domaine déjà pris
+      return !data
     } catch (error) {
       console.error('Erreur lors de la vérification du sous-domaine:', error)
       return false
@@ -145,7 +281,7 @@ export const startupMarketplaceService = {
   checkCustomDomainAvailability: async (domain: string): Promise<boolean> => {
     try {
       const { error } = await supabase
-        .from('public.tenants')
+        .from('tenants')
         .select('id')
         .eq('custom_domain', domain.toLowerCase())
         .single()
@@ -228,7 +364,7 @@ export const startupMarketplaceService = {
 
       // 3. Créer le tenant
       const { data: tenant, error: tenantError } = await supabase
-        .from('public.tenants')
+        .from('tenants')
         .insert([{
           name: request.company_name,
           subdomain: request.subdomain.toLowerCase(),
@@ -239,15 +375,32 @@ export const startupMarketplaceService = {
         .single()
 
       if (tenantError) {
+        // Gestion des erreurs de contraintes
+        if (tenantError.code === '23505') {
+          if (tenantError.message.includes('subdomain')) {
+            return {
+              success: false,
+              error: 'Ce sous-domaine est déjà utilisé'
+            }
+          }
+          if (tenantError.message.includes('custom_domain')) {
+            return {
+              success: false,
+              error: 'Ce domaine personnalisé est déjà utilisé'
+            }
+          }
+        }
         throw new Error(`Erreur lors de la création du tenant: ${tenantError.message}`)
       }
 
       // 4. Créer les paramètres du marketplace
       const { error: settingsError } = await supabase
-        .from('public.marketplace_settings')
+        .from('marketplace_settings')
         .insert([{
           tenant_id: tenant.id,
           company_name: request.company_name,
+          subdomain: request.subdomain.toLowerCase(),
+          custom_domain: request.custom_domain?.toLowerCase() || null,
           public_access: request.public_access ?? true,
           primary_color: request.primary_color || '#10b981',
           show_prices: true,
@@ -257,7 +410,7 @@ export const startupMarketplaceService = {
 
       if (settingsError) {
         // Nettoyer les données créées
-        await supabase.from('public.tenants').delete().eq('id', tenant.id)
+        await supabase.from('tenants').delete().eq('id', tenant.id)
         return {
           success: false,
           error: 'Erreur lors de la création des paramètres'
@@ -279,7 +432,7 @@ export const startupMarketplaceService = {
       console.error('Erreur lors de la création du marketplace:', error)
       return {
         success: false,
-        error: error.message || 'Erreur technique lors de la création'
+        error: (error as Error).message || 'Erreur technique lors de la création'
       }
     }
   },
@@ -297,18 +450,18 @@ export const startupMarketplaceService = {
 
       // 2. Supprimer les données du marketplace (ordre important pour les FK)
       const tablesToClean = [
-        'public.order_items',
-        'public.orders',
-        'public.product_categories',
-        'public.product_field_values',
-        'public.product_field_display',
-        'public.product_fields',
-        'public.products',
-        'public.categories',
-        'public.marketplace_settings',
-        'public.tenant_users',
-        'public.user_profiles',
-        'public.marketplace_subscriptions'
+        'order_items',
+        'orders',
+        'product_categories',
+        'product_field_values',
+        'product_field_display',
+        'product_fields',
+        'products',
+        'categories',
+        'marketplace_settings',
+        'tenant_users',
+        'user_profiles',
+        'marketplace_subscriptions'
       ]
 
       for (const table of tablesToClean) {
@@ -316,7 +469,7 @@ export const startupMarketplaceService = {
       }
 
       // 3. Supprimer le tenant
-      await supabase.from('public.tenants').delete().eq('id', tenantId)
+      await supabase.from('tenants').delete().eq('id', tenantId)
 
       return true
     } catch (error) {
@@ -352,16 +505,20 @@ export const startupMarketplaceService = {
 
       if (error) throw error
 
-      return (data || []).map((sub: Record<string, unknown>) => ({
-        tenant_id: sub.tenant_id,
-        tenant_name: (sub.public_tenants as Record<string, unknown>)?.name as string || '',
-        subdomain: (sub.public_tenants as Record<string, unknown>)?.subdomain as string || '',
-        custom_domain: (sub.public_tenants as Record<string, unknown>)?.custom_domain as string,
-        marketplace_url: (sub.public_tenants as Record<string, unknown>)?.custom_domain as string || `${(sub.public_tenants as Record<string, unknown>)?.subdomain}.spares-tech.com`,
-        subscription_status: sub.status as string,
-        plan_name: (sub.startup_subscription_plans as Record<string, unknown>)?.display_name as string || '',
-        created_at: sub.created_at as string
-      }))
+      return (data || []).map((sub: Record<string, unknown>) => {
+        const tenant = sub.tenants as Record<string, unknown> | null
+        const plan = sub.subscription_plans as Record<string, unknown> | null
+        return {
+          tenant_id: sub.tenant_id as string,
+          tenant_name: tenant?.name as string || '',
+          subdomain: tenant?.subdomain as string || '',
+          custom_domain: tenant?.custom_domain as string | null,
+          marketplace_url: tenant?.custom_domain as string || `${tenant?.subdomain}.spares-tech.com`,
+          subscription_status: sub.status as string,
+          plan_name: plan?.display_name as string || '',
+          created_at: sub.created_at as string
+        }
+      })
     } catch (error) {
       console.error('Erreur lors de la récupération des marketplaces:', error)
       return []
@@ -390,7 +547,7 @@ export const startupMarketplaceService = {
           status,
           created_at,
           startup_customers(first_name, last_name, company_name),
-          public_tenants(name, subdomain),
+          tenants(name, subdomain),
           startup_subscription_plans(price_monthly, price_yearly),
           billing_cycle
         `)
@@ -413,15 +570,22 @@ export const startupMarketplaceService = {
         }
       })
 
-      const recentMarketplaces = subscriptions.slice(0, 5).map((sub: Record<string, unknown>) => ({
-        tenant_name: (sub.public_tenants as Record<string, unknown>)?.name as string || '',
-        subdomain: (sub.public_tenants as Record<string, unknown>)?.subdomain as string || '',
-        customer_name: sub.startup_customers ? `${(sub.startup_customers as Record<string, unknown>).first_name} ${(sub.startup_customers as Record<string, unknown>).last_name}` : '',
-        created_at: sub.created_at as string
-      }))
+      const recentMarketplaces = subscriptions.slice(0, 5).map((sub: Record<string, unknown>) => {
+        const tenant = sub.tenants as Record<string, unknown> | null
+        const customer = sub.startup_customers as Record<string, unknown> | null
+        return {
+          tenant_name: tenant?.name as string || '',
+          subdomain: tenant?.subdomain as string || '',
+          customer_name: customer ? `${customer.first_name} ${customer.last_name}` : '',
+          created_at: sub.created_at as string
+        }
+      })
 
       // Compter les clients uniques
-      const uniqueCustomers = new Set(subscriptions.map((sub: Record<string, unknown>) => (sub.startup_customers as Record<string, unknown>)?.company_name).filter(Boolean))
+      const uniqueCustomers = new Set(subscriptions.map((sub: Record<string, unknown>) => {
+        const customer = sub.startup_customers as Record<string, unknown> | null
+        return customer?.company_name as string
+      }).filter(Boolean))
 
       return {
         totalMarketplaces: subscriptions.length,

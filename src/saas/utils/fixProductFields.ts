@@ -1,4 +1,4 @@
-import { supabase } from '../lib/supabase'
+import { supabase } from '../../lib/supabase'
 
 // Fonction pour forcer la réinitialisation des champs système
 export async function forceInitializeSystemFields(): Promise<boolean> {

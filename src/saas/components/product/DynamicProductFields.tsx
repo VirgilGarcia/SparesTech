@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react'
+import React, { useState, useEffect, useCallback } from 'react'
 import { productService } from '../../services/productService'
 import { productStructureService } from '../../services/productStructureService'
 import type { ProductField, ProductFieldDisplay } from '../../services/productService'
@@ -18,14 +18,7 @@ const DynamicProductFields: React.FC<DynamicProductFieldsProps> = ({
   const [fieldDisplay, setFieldDisplay] = useState<ProductFieldDisplay[]>([])
   const [loading, setLoading] = useState(true)
 
-  useEffect(() => {
-    loadFields()
-    if (productId) {
-      loadExistingValues()
-    }
-  }, [productId])
-
-  const loadFields = async () => {
+  const loadFields = useCallback(async () => {
     try {
       setLoading(true)
       const [fieldsData, displayData] = await Promise.all([
@@ -39,9 +32,9 @@ const DynamicProductFields: React.FC<DynamicProductFieldsProps> = ({
     } finally {
       setLoading(false)
     }
-  }
+  }, [])
 
-  const loadExistingValues = async () => {
+  const loadExistingValues = useCallback(async () => {
     if (!productId) return
     
     try {
@@ -58,7 +51,14 @@ const DynamicProductFields: React.FC<DynamicProductFieldsProps> = ({
     } catch (error) {
       console.error('Erreur lors du chargement des valeurs existantes:', error)
     }
-  }
+  }, [productId, values, onChange])
+
+  useEffect(() => {
+    loadFields()
+    if (productId) {
+      loadExistingValues()
+    }
+  }, [productId, loadFields, loadExistingValues])
 
   const handleFieldChange = (fieldName: string, value: string) => {
     onChange({ ...values, [fieldName]: value })

@@ -1,6 +1,6 @@
 import { createContext, useContext, type ReactNode } from 'react'
 import { useTenant } from '../hooks/useTenant'
-import type { Tenant, UserProfile } from '../services/saas/tenantService'
+import type { Tenant, UserProfile } from '../../saas/services/tenantService'
 
 interface TenantContextType {
   tenant: Tenant | null

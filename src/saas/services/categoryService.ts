@@ -1,5 +1,5 @@
 import { supabase } from '../../lib/supabase'
-import { withTenant, getCurrentTenantId } from '../../utils/tenantUtils'
+import { withTenant, getCurrentTenantId } from '../../shared/utils/tenantUtils'
 
 export interface Category {
   id: number

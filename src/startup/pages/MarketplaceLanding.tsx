@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { marketplaceProvisioningService } from '../services/marketplaceProvisioningService'
-import type { MarketplaceCreationRequest, TenantCreationResult } from '../types/marketplace'
+import type { MarketplaceCreationRequest, TenantCreationResult } from '../../shared/types/marketplace'
 
 function MarketplaceLanding() {
   const [step, setStep] = useState<'form' | 'processing' | 'success' | 'error'>('form')

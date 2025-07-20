@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useRef, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
 import { useTenantContext } from '../context/TenantContext'
-import { settingsService } from '../services/saas/settingsService'
-import type { MarketplaceSettings } from '../services/saas/settingsService'
+import { settingsService } from '../../saas/services/settingsService'
+import type { MarketplaceSettings } from '../../saas/services/settingsService'
 
 interface ThemeState {
   settings: MarketplaceSettings | null
@@ -20,13 +20,7 @@ export function useTheme() {
   })
   const cacheRef = useRef<Map<string, { data: MarketplaceSettings; timestamp: number }>>(new Map())
 
-  // Vérifier le cache local storage au démarrage
-  useEffect(() => {
-    // Forcer le rechargement des paramètres (ignorer le cache temporairement)
-    loadSettings()
-  }, [])
-
-  const loadSettings = async () => {
+  const loadSettings = useCallback(async () => {
     try {
       setState(prev => ({ ...prev, loading: true }))
       
@@ -53,7 +47,13 @@ export function useTheme() {
         initialized: true
       })
     }
-  }
+  }, [tenantId])
+
+  // Vérifier le cache local storage au démarrage
+  useEffect(() => {
+    // Forcer le rechargement des paramètres (ignorer le cache temporairement)
+    loadSettings()
+  }, [loadSettings])
 
   const updateSettings = async (updates: Partial<MarketplaceSettings>) => {
     if (!user || !state.settings || !tenantId) return
@@ -86,10 +86,10 @@ export function useTheme() {
     cacheRef.current.clear()
   }
 
-  const refreshSettings = () => {
+  const refreshSettings = useCallback(() => {
     clearCache()
     loadSettings()
-  }
+  }, [loadSettings])
 
   // Valeurs par défaut sécurisées
   const defaultTheme = {

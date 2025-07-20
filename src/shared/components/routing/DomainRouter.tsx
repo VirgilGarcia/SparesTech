@@ -5,7 +5,6 @@ import type { DomainInfo } from '../../types/marketplace'
 
 // Import des composants du site principal
 import StartupRouter from '../../../startup/components/StartupRouter'
-import MarketplaceLanding from '../../../startup/pages/MarketplaceLanding'
 
 // Import des composants du marketplace client
 import Login from '../../../saas/pages/public/Login'
@@ -45,10 +44,30 @@ function DomainRouter() {
     const initializeDomain = async () => {
       try {
         const info = await getCurrentDomainInfo()
+        
+        // Debug logging détaillé
+        console.log('🔍 Debug Domain Info:', {
+          hostname: window.location.hostname,
+          search: window.location.search,
+          href: window.location.href,
+          pathname: window.location.pathname,
+          isMainSite: info.isMainSite,
+          subdomain: info.subdomain,
+          tenantId: info.tenantId,
+          customDomain: info.customDomain
+        })
+        
+        // Debug spécifique pour le paramètre tenant
+        const urlParams = new URLSearchParams(window.location.search)
+        const tenantParam = urlParams.get('tenant')
+        console.log('🎯 Tenant param:', tenantParam)
+        console.log('🎯 All URL params:', Object.fromEntries(urlParams.entries()))
+        
         setDomainInfo(info)
         
         // Si c'est un sous-domaine/domaine personnalisé mais aucun tenant trouvé
         if (!info.isMainSite && !info.tenantId) {
+          console.error('❌ Tenant not found for domain info:', info)
           setError('Marketplace introuvable pour ce domaine')
         }
       } catch (err) {
