@@ -125,13 +125,23 @@ export class OrderService {
 
       // Mettre à jour le stock des produits
       for (const item of orderData.items) {
-        await supabaseServiceRole
+        // Récupérer le stock actuel
+        const { data: product } = await supabaseServiceRole
           .from('products')
-          .update({
-            stock_quantity: supabaseServiceRole.sql`stock_quantity - ${item.quantity}`,
-            updated_at: new Date().toISOString()
-          })
+          .select('stock_quantity')
           .eq('id', item.product_id)
+          .single()
+        
+        if (product) {
+          const newStock = Math.max(0, product.stock_quantity - item.quantity)
+          await supabaseServiceRole
+            .from('products')
+            .update({
+              stock_quantity: newStock,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', item.product_id)
+        }
       }
 
       logger.info('Commande créée', { 

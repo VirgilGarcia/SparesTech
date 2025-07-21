@@ -25,11 +25,17 @@ export const settingsService = {
   /**
    * Récupère les paramètres pour un tenant
    */
-  getSettings: async (tenantId?: string): Promise<MarketplaceSettings> => {
+  getSettings: async (_tenantId?: string): Promise<MarketplaceSettings> => {
     try {
       const api = useSettingsApi()
       const settings = await api.getSettings()
-      return settings || {
+      return settings ? {
+        ...settings,
+        logo_url: settings.logo_url || null,
+        company_name: settings.company_name || null,
+        subdomain: settings.subdomain || null,
+        custom_domain: settings.custom_domain || null
+      } : {
         public_access: true,
         show_prices: true,
         show_stock: true,
@@ -60,38 +66,66 @@ export const settingsService = {
    * Met à jour les paramètres
    */
   updateSettings: async (
-    tenantId: string, 
+    _tenantId: string, 
     updates: Partial<MarketplaceSettings>
   ): Promise<MarketplaceSettings> => {
     const api = useSettingsApi()
-    const result = await api.updateSettings(updates)
+    const cleanUpdates = {
+      ...updates,
+      company_name: updates.company_name === null ? undefined : updates.company_name,
+      logo_url: updates.logo_url === null ? undefined : updates.logo_url,
+      subdomain: updates.subdomain === null ? undefined : updates.subdomain,
+      custom_domain: updates.custom_domain === null ? undefined : updates.custom_domain
+    }
+    const result = await api.updateSettings(cleanUpdates)
     if (!result) {
       throw new Error('Impossible de mettre à jour les paramètres')
     }
-    return result
+    return {
+      ...result,
+      logo_url: result.logo_url || null,
+      company_name: result.company_name || null,
+      subdomain: result.subdomain || null,
+      custom_domain: result.custom_domain || null
+    }
   },
 
   /**
    * Upload du logo
    */
-  uploadLogo: async (tenantId: string, file: File): Promise<string> => {
+  uploadLogo: async (_tenantId: string, file: File): Promise<string> => {
     const api = useSettingsApi()
-    return api.uploadLogo(file)
+    const result = await api.uploadLogo(file)
+    return result || ''
   },
 
   /**
    * Supprime le logo
    */
-  deleteLogo: async (tenantId: string): Promise<boolean> => {
+  deleteLogo: async (_tenantId: string): Promise<boolean> => {
     try {
-      const api = useSettingsApi()
-      return api.deleteLogo()
+      // TODO: implémenter deleteLogo dans l'API
+      console.warn('deleteLogo non encore implémenté')
+      return false
     } catch (error) {
       console.error('Erreur lors de la suppression du logo:', error)
       return false
     }
+  },
+
+  /**
+   * Alias pour deleteLogo
+   */
+  removeLogo: async (tenantId: string): Promise<boolean> => {
+    return settingsService.deleteLogo(tenantId)
+  },
+
+  /**
+   * Récupérer les paramètres publics d'un marketplace
+   */
+  getPublicSettings: async (tenantId: string): Promise<MarketplaceSettings> => {
+    return settingsService.getSettings(tenantId)
   }
 }
 
-// Export des types pour compatibilité
-export type { MarketplaceSettings }
+// Types déjà exportés ci-dessus

@@ -19,7 +19,7 @@ export function RegisterGuard({ children }: RegisterGuardProps) {
   const loadSettings = async () => {
     try {
       setLoading(true)
-      const data = await settingsService.getPublicSettings()
+      const data = await settingsService.getPublicSettings('default')
       setSettings(data)
     } catch (error) {
       console.error('Erreur lors du chargement des paramètres:', error)

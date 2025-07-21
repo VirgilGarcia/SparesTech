@@ -67,7 +67,7 @@ function AdminDashboard() {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
       
-      const ordersThisMonth = orders.filter(order => {
+      const ordersThisMonth = orders.filter((order: any) => {
         const d = new Date(order.created_at)
         return d >= startOfMonth && d < endOfMonth
       })
@@ -75,8 +75,8 @@ function AdminDashboard() {
       setMonthlyStats({
         productsCount: products.length,
         ordersCount: ordersThisMonth.length,
-        totalRevenue: ordersThisMonth.reduce((sum, order) => sum + order.total_amount, 0),
-        pendingOrders: ordersThisMonth.filter(order => order.status === 'pending').length
+        totalRevenue: ordersThisMonth.reduce((sum: number, order: any) => sum + order.total_amount, 0),
+        pendingOrders: ordersThisMonth.filter((order: any) => order.status === 'pending').length
       })
       
       const weekOrders = [0,0,0,0,0,0,0]

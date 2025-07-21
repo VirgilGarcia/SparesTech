@@ -8,7 +8,16 @@ import { productStructureService } from '../../services/productStructureService'
 import Header from '../../components/layout/Header'
 import FieldRenderer from '../../components/ui/FieldRenderer'
 import CategoryBreadcrumb from '../../components/category/CategoryBreadcrumb'
-import type { Product, ProductFieldDisplay, ProductFieldValue, ProductField } from '../../services/productService'
+import type { Product, ProductFieldDisplay, ProductField } from '../../services/productService'
+
+export interface ProductFieldValue {
+  id: string
+  product_id: string  
+  field_id: string
+  value: any
+  created_at?: string
+  updated_at?: string
+}
 
 interface ProductFieldValueWithField extends ProductFieldValue {
   product_fields: ProductField
@@ -73,7 +82,7 @@ function ProductDetail() {
       const values: { [key: string]: string } = {}
       fieldValues.forEach(fv => {
         if (fv.product_fields) {
-          values[fv.product_fields.name] = fv.value
+          values[fv.product_fields.name] = fv.value?.toString() || ''
         }
       })
       setCustomFieldValues(values)
@@ -141,7 +150,7 @@ function ProductDetail() {
   // Fonction pour afficher tous les champs dans l'ordre configuré (page produit)
   const renderOrderedFields = () => {
     const allFields = fieldDisplay
-      .filter(display => display.show_in_product)
+      .filter(display => (display as any).show_in_product || display.active)
       .filter(display => !['visible', 'vendable', 'photo_url'].includes(display.field_name))
       .sort((a, b) => a.product_order - b.product_order)
 

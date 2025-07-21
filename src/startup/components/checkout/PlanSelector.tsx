@@ -73,7 +73,7 @@ const PlanSelector: React.FC<PlanSelectorProps> = ({
             <div className="text-center">
               <div className="font-semibold">Mensuel</div>
               <div className="text-sm text-gray-600">
-                {formatPrice(selectedPlan.monthly_price)}/mois
+                {formatPrice(selectedPlan.price_monthly)}/mois
               </div>
             </div>
           </button>
@@ -88,7 +88,7 @@ const PlanSelector: React.FC<PlanSelectorProps> = ({
             <div className="text-center">
               <div className="font-semibold">Annuel</div>
               <div className="text-sm text-gray-600">
-                {formatPrice(selectedPlan.yearly_price)}/an
+                {formatPrice(selectedPlan.price_yearly)}/an
               </div>
               {selectedPlan.yearly_discount && (
                 <div className="text-xs text-green-600 font-medium">

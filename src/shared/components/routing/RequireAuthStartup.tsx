@@ -30,7 +30,7 @@ export function RequireAuthStartup({ children }: RequireAuthStartupProps) {
             email: user.email || '',
             first_name: user.user_metadata?.first_name || '',
             last_name: user.user_metadata?.last_name || '',
-            company_name: user.user_metadata?.company_name || undefined // ✅ Optionnel
+            // Pas de company_name ici car il n'est pas dans CreateStartupUser
           })
         } catch (error) {
           console.error('Erreur lors de la création du profil startup:', error)

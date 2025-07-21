@@ -55,7 +55,7 @@ export const useProductFieldApi = () => {
     setLoading(true)
     setError(null)
     try {
-      const params = activeOnly ? { active: true } : {}
+      const params = activeOnly ? { active: 'true' } : {}
       const response = await api.get('/product-fields', { params })
       return response.data || []
     } catch (err) {
@@ -260,6 +260,55 @@ export const useProductFieldApi = () => {
     }
   }, [api])
 
+  /**
+   * Récupère les valeurs des champs pour un produit spécifique
+   */
+  const getProductFieldValues = useCallback(async (productId: string): Promise<Array<{
+    id: string
+    product_id: string
+    product_field_id: string
+    value: string
+    product_fields?: ProductField
+  }>> => {
+    setLoading(true)
+    setError(null)
+    try {
+      const response = await api.get(`/products/${productId}/field-values`)
+      return response.data || []
+    } catch (err) {
+      const errorMessage = 'Impossible de récupérer les valeurs des champs'
+      setError(errorMessage)
+      throw new Error(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }, [api])
+
+  /**
+   * Met à jour/créer une valeur de champ pour un produit
+   */
+  const setProductFieldValue = useCallback(async (
+    productId: string, 
+    fieldId: string, 
+    value: string
+  ): Promise<boolean> => {
+    setLoading(true)
+    setError(null)
+    try {
+      await api.post(`/products/${productId}/field-values`, {
+        product_field_id: fieldId,
+        value
+      })
+      return true
+    } catch (err) {
+      const errorMessage = 'Impossible de mettre à jour la valeur du champ'
+      setError(errorMessage)
+      throw new Error(errorMessage)
+    } finally {
+      setLoading(false)
+    }
+  }, [api])
+
   return {
     // État
     loading,
@@ -279,6 +328,10 @@ export const useProductFieldApi = () => {
     getSystemFields,
     getCustomFields,
     getCatalogFields,
-    getProductEditFields
+    getProductEditFields,
+    
+    // Méthodes pour les valeurs des champs produits
+    getProductFieldValues,
+    setProductFieldValue
   }
 }

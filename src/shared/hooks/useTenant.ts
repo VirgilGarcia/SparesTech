@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { useAuth } from '../context/AuthContext'
-import { tenantService, type Tenant, type UserProfile } from '../../saas/services/tenantService'
+import { tenantService, type Tenant } from '../../saas/services/tenantService'
+import { userProfileService, type UserProfile } from '../../saas/services/userProfileService'
 
 export function useTenant() {
   const { user } = useAuth()
@@ -17,13 +18,25 @@ export function useTenant() {
       setError(null)
 
       // Charger d'abord le profil pour éviter la récursion
-      const profileData = await tenantService.getUserProfile(user.id)
+      const profileData = await userProfileService.getUserProfile(user.id)
       setUserProfile(profileData)
 
       // Charger le tenant seulement si l'utilisateur a un profil SaaS
       if (profileData?.tenant_id) {
-        const tenantData = await tenantService.getUserTenant(user.id)
-        setTenant(tenantData)
+        const tenantData = await tenantService.getTenantById(profileData.tenant_id)
+        if (tenantData) {
+          // Adapter le tenant de l'API pour inclure subscription_status
+          const adaptedTenant: Tenant = {
+            ...tenantData,
+            subscription_status: 'active', // Valeur par défaut
+            subdomain: tenantData.subdomain || null,
+            custom_domain: tenantData.custom_domain || null,
+            custom_domain_verified: false
+          }
+          setTenant(adaptedTenant)
+        } else {
+          setTenant(null)
+        }
       } else {
         setTenant(null)
       }
@@ -57,7 +70,7 @@ export function useTenant() {
     if (!user || !userProfile) return undefined
 
     try {
-      const updatedProfile = await tenantService.updateUserProfile(user.id, updates)
+      const updatedProfile = await userProfileService.updateUserProfile(user.id, updates)
       setUserProfile(updatedProfile)
       return updatedProfile
     } catch (err) {

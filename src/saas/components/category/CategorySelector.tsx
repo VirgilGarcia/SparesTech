@@ -36,7 +36,7 @@ function CategorySelector({
   const loadCategories = async () => {
     try {
       setLoading(true)
-      const tree = await categoryService.getCategoryTree()
+      const tree = await categoryService.getCategoriesTree()
       setCategoryTree(tree)
     } catch (error) {
       console.error('Erreur lors du chargement des catégories:', error)
@@ -80,16 +80,16 @@ function CategorySelector({
         >
           <div className="flex items-center space-x-2">
             <span className="text-sm">{category.name}</span>
-            {category.children.length > 0 && (
-              <span className="text-xs text-gray-500">({category.children.length})</span>
+            {(category.children || []).length > 0 && (
+              <span className="text-xs text-gray-500">({(category.children || []).length})</span>
             )}
           </div>
         </button>
         
         {/* Sous-catégories */}
-        {category.children.length > 0 && (
+        {(category.children || []).length > 0 && (
           <div className="border-l border-gray-200 ml-3">
-            {category.children.map(child => renderCategoryOption(child, level + 1))}
+            {(category.children || []).map(child => renderCategoryOption(child, level + 1))}
           </div>
         )}
       </div>

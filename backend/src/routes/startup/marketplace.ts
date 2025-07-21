@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { body, param, query } from 'express-validator'
 import { validate } from '../../middleware/validation'
 import { requireAuth, requireStartupOwner, AuthenticatedRequest } from '../../middleware/auth'
@@ -33,19 +33,22 @@ router.get('/plans/:planId',
   validate([
     param('planId').isUUID()
   ]),
-  async (req, res) => {
+  async (req: Request, res: Response): Promise<Response | void> => {
     try {
       const { planId } = req.params
+      if (!planId) {
+        return res.status(400).json({ success: false, error: 'ID du plan requis' })
+      }
       const result = await StartupSubscriptionService.getPlanById(planId)
       
       if (!result.success) {
         return res.status(404).json(result)
       }
 
-      res.json(result)
+      return res.json(result)
     } catch (error: any) {
       logger.error('Erreur API récupération plan', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -61,14 +64,14 @@ router.post('/check-subdomain',
   validate([
     body('subdomain').trim().isLength({ min: 2, max: 63 }).matches(/^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/)
   ]),
-  async (req, res) => {
+  async (req: Request, res: Response): Promise<Response | void> => {
     try {
       const { subdomain } = req.body
       const result = await MarketplaceService.checkSubdomainAvailability(subdomain)
-      res.json(result)
+      return res.json(result)
     } catch (error: any) {
       logger.error('Erreur API vérification sous-domaine', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -84,14 +87,14 @@ router.post('/suggest-subdomains',
   validate([
     body('base_name').trim().isLength({ min: 2, max: 50 })
   ]),
-  async (req, res) => {
+  async (req: Request, res: Response): Promise<Response | void> => {
     try {
       const { base_name } = req.body
       const result = await MarketplaceService.generateSubdomainSuggestions(base_name)
-      res.json(result)
+      return res.json(result)
     } catch (error: any) {
       logger.error('Erreur API suggestions sous-domaines', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -118,7 +121,7 @@ router.post('/create',
     body('plan_id').isUUID(),
     body('billing_cycle').isIn(['monthly', 'yearly'])
   ]),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const userId = req.user.id
       const marketplaceData = req.body
@@ -135,11 +138,11 @@ router.post('/create',
         subdomain: marketplaceData.subdomain 
       })
 
-      res.status(201).json(result)
+      return res.status(201).json(result)
 
     } catch (error: any) {
       logger.error('Erreur API création marketplace', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -154,7 +157,7 @@ router.post('/create',
 router.get('/my-marketplaces',
   requireAuth,
   requireStartupOwner,
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const userId = req.user.id
       const result = await MarketplaceService.getUserMarketplaces(userId)
@@ -163,11 +166,11 @@ router.get('/my-marketplaces',
         return res.status(400).json(result)
       }
 
-      res.json(result)
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API récupération marketplaces', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -182,7 +185,7 @@ router.get('/my-marketplaces',
 router.get('/subscriptions',
   requireAuth,
   requireStartupOwner,
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const userId = req.user.id
       const result = await StartupSubscriptionService.getCustomerSubscriptions(userId)
@@ -191,11 +194,11 @@ router.get('/subscriptions',
         return res.status(400).json(result)
       }
 
-      res.json(result)
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API récupération subscriptions', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -210,7 +213,7 @@ router.get('/subscriptions',
 router.get('/subscriptions/active',
   requireAuth,
   requireStartupOwner,
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const userId = req.user.id
       const result = await StartupSubscriptionService.getActiveSubscription(userId)
@@ -219,11 +222,11 @@ router.get('/subscriptions/active',
         return res.status(404).json(result)
       }
 
-      res.json(result)
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API récupération subscription active', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })

@@ -67,5 +67,23 @@ export const startupCustomerService = {
   }
 }
 
+// Types additionnels pour compatibilité legacy
+export interface ProspectData {
+  id: string
+  email: string
+  company_name?: string
+  status: string
+}
+
+export interface StartupLead {
+  id: string
+  email: string
+  company_name?: string
+  created_at: string
+}
+
+// Alias pour compatibilité
+export const customerService = startupCustomerService
+
 // Export des types pour compatibilité
 export type { StartupCustomer, CreateCustomerData }

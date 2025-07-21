@@ -49,7 +49,6 @@ const Profile: React.FC = () => {
             email: user.email || '',
             first_name: user.user_metadata?.first_name || '',
             last_name: user.user_metadata?.last_name || '',
-            company_name: user.user_metadata?.company_name || ''
           })
           setUserProfile(profile)
           
@@ -138,7 +137,7 @@ const Profile: React.FC = () => {
     
     setLoading(true)
     try {
-      await changeUserPassword(passwordData.newPassword)
+      await changeUserPassword(passwordData.currentPassword, passwordData.newPassword)
 
       setMessage('Mot de passe mis à jour avec succès')
       setIsChangingPassword(false)

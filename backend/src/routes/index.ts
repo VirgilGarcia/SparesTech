@@ -6,6 +6,13 @@ import startupMarketplaceRoutes from './startup/marketplace'
 
 // Routes SaaS
 import saasProductRoutes from './saas/products'
+import saasUserRoutes from './saas/users'
+
+// Routes API principales
+import productRoutes from './products'
+import categoryRoutes from './categories'
+import orderRoutes from './orders'
+import productFieldRoutes from './product-fields'
 
 const router = Router()
 
@@ -14,7 +21,14 @@ router.use('/startup/auth', startupAuthRoutes)
 router.use('/startup/marketplace', startupMarketplaceRoutes)
 
 // === ROUTES SAAS ===
-router.use('/saas', saasProductRoutes)
+router.use('/saas/products', saasProductRoutes)
+router.use('/saas/users', saasUserRoutes)
+
+// === ROUTES API PRINCIPALES ===
+router.use('/products', productRoutes)
+router.use('/categories', categoryRoutes)
+router.use('/orders', orderRoutes)
+router.use('/product-fields', productFieldRoutes)
 
 // === ROUTE HEALTH CHECK ===
 router.get('/health', (req, res) => {

@@ -22,8 +22,6 @@ import {
 function AdminProducts() {
   const { user, loading: authLoading } = useAuth()
   const { theme } = useMarketplaceTheme()
-  const [userRole, setUserRole] = useState<string | null>(null)
-  const [roleLoading, setRoleLoading] = useState(false)
   const [products, setProducts] = useState<Product[]>([])
   const [categories, setCategories] = useState<Category[]>([])
   const [loading, setLoading] = useState(true)
@@ -57,11 +55,8 @@ function AdminProducts() {
     isVisible: false
   })
 
-  useEffect(() => {
-    if (user) {
-      loadUserRole()
-    }
-  }, [user])
+  // Utiliser le hook personnalisé pour le rôle utilisateur
+  const { userRole, loading: roleLoading } = useUserRole()
 
   useEffect(() => {
     if (userRole === 'admin') {
@@ -79,41 +74,34 @@ function AdminProducts() {
     }
   }
 
-  // Utiliser le hook personnalisé pour le rôle utilisateur
-  const { userRole: role, loading: roleLoading } = useUserRole()
-  
-  useEffect(() => {
-    setUserRole(role)
-    setRoleLoading(roleLoading)
-  }, [role, roleLoading])
 
   const loadProducts = async () => {
     try {
       setLoading(true)
       
-      // Préparer tous les paramètres pour la requête serveur optimisée
+      // Préparer tous les paramètres pour la requête serveur avec pagination
       const params = {
-        page: currentPage,
         limit: itemsPerPage,
+        offset: (currentPage - 1) * itemsPerPage,
         search: searchQuery || undefined,
-        sortBy: sortBy,
-        sortOrder: sortOrder,
+        sort_by: sortBy,
+        sort_order: sortOrder,
         // Filtres de catégorie
-        categoryId: filters.category ? parseInt(filters.category) : undefined,
-        // Tous les filtres sont maintenant côté serveur pour optimiser les performances
-        stockLevel: filters.stockLevel as 'in_stock' | 'low_stock' | 'out_of_stock' | undefined,
+        category_id: filters.category ? parseInt(filters.category) : undefined,
+        // Filtres pour l'API backend
         visible: filters.visible ? filters.visible === 'visible' : undefined,
         vendable: filters.vendable ? filters.vendable === 'vendable' : undefined,
-        priceMin: filters.priceMin ? parseFloat(filters.priceMin) : undefined,
-        priceMax: filters.priceMax ? parseFloat(filters.priceMax) : undefined
+        min_price: filters.priceMin ? parseFloat(filters.priceMin) : undefined,
+        max_price: filters.priceMax ? parseFloat(filters.priceMax) : undefined,
+        in_stock: filters.stockLevel === 'in_stock' ? true : 
+                  filters.stockLevel === 'out_of_stock' ? false : undefined
       }
 
-      const response = await productService.getAllProductsPaginated(params)
+      const response = await productService.getProducts(params)
       
-      // Plus de filtrage côté client - tout est fait côté serveur maintenant
-      setProducts(response.data)
-      setTotalItems(response.total)
-      setTotalPages(response.totalPages)
+      setProducts(response.products)
+      setTotalItems(response.totalCount)
+      setTotalPages(Math.ceil(response.totalCount / itemsPerPage))
     } catch (error) {
       console.error('Erreur lors du chargement des produits:', error)
       showToast('Erreur lors du chargement des produits', 'error')

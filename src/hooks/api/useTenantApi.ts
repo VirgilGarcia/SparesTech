@@ -2,8 +2,8 @@ import { useState } from 'react'
 import { api } from '../../lib/api'
 
 export function useTenantApi() {
-  const [loading, setLoading] = useState(false)
-  const [error, setError] = useState<string | null>(null)
+  const [loading] = useState(false)
+  const [error] = useState<string | null>(null)
 
   /**
    * Récupérer le tenant_id de l'utilisateur connecté

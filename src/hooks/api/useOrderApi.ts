@@ -113,8 +113,8 @@ export const useOrderApi = () => {
     try {
       const response = await api.get('/orders', { params: filter })
       return {
-        data: response.data || [],
-        total: response.total || 0
+        data: response.data?.orders || response.data || [],
+        total: response.data?.total || response.data?.length || 0
       }
     } catch (err) {
       const errorMessage = 'Impossible de récupérer les commandes'
@@ -280,7 +280,7 @@ export const useOrderApi = () => {
       if (endDate) params.end_date = endDate
 
       const response = await api.get('/orders/stats', { params })
-      return response.data
+      return response.data || {}
     } catch (err) {
       const errorMessage = 'Impossible de récupérer les statistiques'
       setError(errorMessage)
@@ -302,7 +302,7 @@ export const useOrderApi = () => {
         params,
         responseType: 'blob'
       })
-      return response
+      return response.data as Blob
     } catch (err) {
       const errorMessage = 'Impossible d\'exporter les commandes'
       setError(errorMessage)
@@ -322,7 +322,7 @@ export const useOrderApi = () => {
       const response = await api.get(`/orders/${orderId}/pdf`, {
         responseType: 'blob'
       })
-      return response
+      return response.data as Blob
     } catch (err) {
       const errorMessage = 'Impossible de générer le PDF'
       setError(errorMessage)

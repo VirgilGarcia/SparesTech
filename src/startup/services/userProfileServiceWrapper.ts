@@ -55,12 +55,38 @@ export const updateStartupUserProfile = async (_userId: string, updates: Partial
   return result
 }
 
+/**
+ * Met à jour l'email d'un utilisateur startup
+ */
+export const updateStartupUserEmail = async (userId: string, email: string): Promise<StartupUser> => {
+  return updateStartupUserProfile(userId, { email })
+}
+
+/**
+ * Change le mot de passe d'un utilisateur
+ */
+export const changeUserPassword = async (_userId: string, _newPassword: string): Promise<boolean> => {
+  console.warn('Changement de mot de passe non encore implémenté - utiliser l\'API d\'authentification directement')
+  // TODO: Implémenter avec l'API d'authentification
+  return Promise.resolve(false)
+}
+
 // Service de gestion des profils utilisateur startup
 export const startupUserProfileService = {
   getOrCreateStartupUserProfile,
   getStartupUserProfile,
-  updateStartupUserProfile
+  updateStartupUserProfile,
+  updateStartupUserEmail,
+  changeUserPassword
 }
 
 // Export des types pour compatibilité
 export type { StartupUser }
+
+// Interface pour la mise à jour avec company_name
+export interface UpdateStartupUser {
+  email?: string
+  first_name?: string
+  last_name?: string
+  company_name?: string
+}

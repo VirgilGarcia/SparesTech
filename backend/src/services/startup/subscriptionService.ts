@@ -82,7 +82,7 @@ export class StartupSubscriptionService {
       // Vérifier que le plan existe
       const planResult = await this.getPlanById(subscriptionData.plan_id)
       if (!planResult.success) {
-        return planResult as ApiResponse<StartupSubscription>
+        return planResult as unknown as ApiResponse<StartupSubscription>
       }
 
       // Vérifier qu'il n'y a pas déjà une subscription active

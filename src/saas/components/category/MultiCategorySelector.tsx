@@ -95,7 +95,7 @@ function MultiCategorySelector({
   const renderCategoryOption = (category: CategoryTree, level: number = 0): React.ReactNode => {
     const isSelected = value?.includes(category.id) || false
     const isExpanded = expanded.has(category.id)
-    const hasChildren = category.children.length > 0
+    const hasChildren = (category.children || []).length > 0
     return (
       <div key={category.id}>
         <div className="flex items-center" style={{ paddingLeft: `${level * 20 + 8}px` }}>
@@ -131,7 +131,7 @@ function MultiCategorySelector({
         {/* Sous-catégories */}
         {hasChildren && isExpanded && (
           <div>
-            {category.children.map(child => renderCategoryOption(child, level + 1))}
+            {(category.children || []).map(child => renderCategoryOption(child, level + 1))}
           </div>
         )}
       </div>

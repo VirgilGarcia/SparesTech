@@ -70,3 +70,15 @@ export interface CreateActivityLogData {
   ip_address?: string
   user_agent?: string
 }
+
+export interface ActivityLogFilter {
+  tenant_id?: string
+  user_id?: string
+  action?: string
+  resource_type?: string
+  resource_id?: string
+  start_date?: string
+  end_date?: string
+  page?: number
+  limit?: number
+}

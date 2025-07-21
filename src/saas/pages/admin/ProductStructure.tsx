@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react'
 import { Navigate } from 'react-router-dom'
 import { useAuth } from '../../../shared/context/AuthContext'
 import { useMarketplaceTheme } from '../../hooks/useMarketplaceTheme'
-import { supabase } from '../../../lib/supabase'
+import { useUserRole } from '../../../shared/hooks/useUserRole'
 import Header from '../../components/layout/Header'
 import { FieldForm, FieldsList, ConfirmModal, DragAndDrop } from '../../components/product-structure'
 import { productStructureService } from '../../services/productStructureService'
@@ -11,8 +11,7 @@ import type { ProductField, ProductFieldDisplay } from '../../services/productSe
 const ProductStructure: React.FC = () => {
   const { user, loading: authLoading } = useAuth()
   const { theme } = useMarketplaceTheme()
-  const [userRole, setUserRole] = useState<string | null>(null)
-  const [roleLoading, setRoleLoading] = useState(false)
+  const { userRole, loading: roleLoading } = useUserRole()
   const [fields, setFields] = useState<ProductField[]>([])
   const [fieldDisplay, setFieldDisplay] = useState<ProductFieldDisplay[]>([])
   const [loading, setLoading] = useState(true)
@@ -45,12 +44,7 @@ const ProductStructure: React.FC = () => {
     default_value: ''
   })
 
-  // Charger le rôle utilisateur
-  useEffect(() => {
-    if (user) {
-      loadUserRole()
-    }
-  }, [user])
+  // Le rôle utilisateur est maintenant géré par useUserRole hook
 
   useEffect(() => {
     if (user && userRole === 'admin') {
@@ -58,26 +52,6 @@ const ProductStructure: React.FC = () => {
     }
   }, [user, userRole])
 
-  const loadUserRole = async () => {
-    if (!user) return
-    
-    try {
-      setRoleLoading(true)
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (error) throw error
-      setUserRole(data.role)
-    } catch (error) {
-      console.error('Erreur lors du chargement du rôle:', error)
-      setUserRole('client')
-    } finally {
-      setRoleLoading(false)
-    }
-  }
 
   const loadData = async () => {
     try {
@@ -252,7 +226,12 @@ const ProductStructure: React.FC = () => {
         return field
       }))
 
-      await productStructureService.reorderFields(updates)
+      const reorderData = updates.map(u => ({
+        fieldId: u.id,
+        catalogOrder: u.catalog_order,
+        productOrder: u.product_order
+      }))
+      await productStructureService.reorderFields(reorderData)
       setSuccessMessage('Ordre des champs mis à jour avec succès')
       setTimeout(() => setSuccessMessage(null), 3000)
     } catch (err) {

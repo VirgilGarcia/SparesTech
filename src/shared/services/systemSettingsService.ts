@@ -1,4 +1,4 @@
-import { useSystemSettingsApi } from '../../../hooks/api/useSystemSettingsApi'
+import { useSystemSettingsApi } from '../../hooks/api/useSystemSettingsApi'
 import type {
   SystemSettings,
   SystemSettingsFilter,

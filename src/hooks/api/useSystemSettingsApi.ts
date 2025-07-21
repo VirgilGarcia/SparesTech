@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import { api } from '../../lib/api'
+import { useState, useCallback } from 'react'
+import { useApiClient } from './useApiClient'
 import type {
   SystemSettings,
   SystemSettingsFilter,
@@ -7,231 +7,180 @@ import type {
   UpdateSystemSettingsData
 } from '../../shared/types/system'
 
-export function useSystemSettingsApi() {
+/**
+ * Hook pour la gestion des paramètres système via l'API backend
+ */
+export const useSystemSettingsApi = () => {
+  const api = useApiClient()
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState<string | null>(null)
 
   /**
    * Récupère tous les paramètres système
    */
-  const getAll = async (filter?: SystemSettingsFilter): Promise<SystemSettings[]> => {
+  const getAll = useCallback(async (filter?: SystemSettingsFilter): Promise<SystemSettings[]> => {
     setLoading(true)
     setError(null)
-    
     try {
-      const params = new URLSearchParams()
-      if (filter?.key) params.append('key', filter.key)
-      if (filter?.category) params.append('category', filter.category)
-      if (filter?.is_public !== undefined) params.append('is_public', filter.is_public.toString())
-      if (filter?.type) params.append('type', filter.type)
-      
-      const response = await api.get<SystemSettings[]>(`/system/settings?${params.toString()}`)
-      
-      if (!response.success) {
-        setError(response.error || 'Erreur lors de la récupération des paramètres système')
-        return []
-      }
-      
+      const response = await api.get('/system/settings', { params: filter })
       return response.data || []
-    } catch (err: any) {
-      setError(err.message || 'Erreur inattendue')
-      return []
+    } catch (err) {
+      const errorMessage = 'Impossible de récupérer les paramètres système'
+      setError(errorMessage)
+      throw new Error(errorMessage)
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
 
   /**
    * Récupère un paramètre système par sa clé
    */
-  const getByKey = async (key: string): Promise<SystemSettings | null> => {
+  const getByKey = useCallback(async (key: string): Promise<SystemSettings | null> => {
     setLoading(true)
     setError(null)
-    
     try {
-      const response = await api.get<SystemSettings>(`/system/settings/${key}`)
-      
-      if (!response.success) {
-        if (response.error?.includes('not found')) {
-          return null
-        }
-        setError(response.error || 'Erreur lors de la récupération du paramètre')
+      const response = await api.get(`/system/settings/${key}`)
+      return response.data || null
+    } catch (err) {
+      if (err instanceof Error && err.message.includes('404')) {
         return null
       }
-      
-      return response.data || null
-    } catch (err: any) {
-      setError(err.message || 'Erreur inattendue')
-      return null
+      const errorMessage = 'Impossible de récupérer le paramètre système'
+      setError(errorMessage)
+      throw new Error(errorMessage)
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
 
   /**
    * Récupère la valeur d'un paramètre système
    */
-  const getValue = async <T = unknown>(key: string, defaultValue?: T): Promise<T> => {
+  const getValue = useCallback(async <T = unknown>(key: string, defaultValue?: T): Promise<T> => {
     try {
       const setting = await getByKey(key)
-      
-      if (!setting) {
-        if (defaultValue !== undefined) return defaultValue
-        throw new Error(`Paramètre système '${key}' introuvable`)
-      }
-      
-      return setting.value as T
+      return setting ? (setting.value as T) : (defaultValue as T)
     } catch (err) {
-      if (defaultValue !== undefined) return defaultValue
-      throw err
+      return defaultValue as T
     }
-  }
+  }, [getByKey])
 
   /**
    * Récupère tous les paramètres publics
    */
-  const getPublicSettings = async (): Promise<SystemSettings[]> => {
+  const getPublicSettings = useCallback(async (): Promise<SystemSettings[]> => {
     return getAll({ is_public: true })
-  }
+  }, [getAll])
 
   /**
    * Récupère les paramètres par catégorie
    */
-  const getByCategory = async (category: string): Promise<SystemSettings[]> => {
+  const getByCategory = useCallback(async (category: string): Promise<SystemSettings[]> => {
     return getAll({ category })
-  }
+  }, [getAll])
 
   /**
    * Crée un nouveau paramètre système
    */
-  const create = async (data: CreateSystemSettingsData): Promise<SystemSettings | null> => {
+  const create = useCallback(async (data: CreateSystemSettingsData): Promise<SystemSettings> => {
     setLoading(true)
     setError(null)
-    
     try {
-      const response = await api.post<SystemSettings>('/system/settings', data)
-      
-      if (!response.success) {
-        setError(response.error || 'Erreur lors de la création du paramètre')
-        return null
-      }
-      
-      return response.data || null
-    } catch (err: any) {
-      setError(err.message || 'Erreur inattendue')
-      return null
+      const response = await api.post('/system/settings', data)
+      return response.data
+    } catch (err) {
+      const errorMessage = 'Impossible de créer le paramètre système'
+      setError(errorMessage)
+      throw new Error(errorMessage)
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
 
   /**
    * Met à jour un paramètre système
    */
-  const update = async (key: string, data: UpdateSystemSettingsData): Promise<SystemSettings | null> => {
+  const update = useCallback(async (key: string, data: UpdateSystemSettingsData): Promise<SystemSettings> => {
     setLoading(true)
     setError(null)
-    
     try {
-      const response = await api.put<SystemSettings>(`/system/settings/${key}`, data)
-      
-      if (!response.success) {
-        setError(response.error || 'Erreur lors de la mise à jour du paramètre')
-        return null
-      }
-      
-      return response.data || null
-    } catch (err: any) {
-      setError(err.message || 'Erreur inattendue')
-      return null
+      const response = await api.put(`/system/settings/${key}`, data)
+      return response.data
+    } catch (err) {
+      const errorMessage = 'Impossible de mettre à jour le paramètre système'
+      setError(errorMessage)
+      throw new Error(errorMessage)
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
 
   /**
    * Met à jour la valeur d'un paramètre système
    */
-  const setValue = async (key: string, value: string | number | boolean | Record<string, unknown>): Promise<SystemSettings | null> => {
+  const setValue = useCallback(async (key: string, value: string | number | boolean | Record<string, unknown>): Promise<SystemSettings> => {
     return update(key, { value })
-  }
+  }, [update])
 
   /**
    * Supprime un paramètre système
    */
-  const deleteParam = async (key: string): Promise<boolean> => {
+  const remove = useCallback(async (key: string): Promise<boolean> => {
     setLoading(true)
     setError(null)
-    
     try {
-      const response = await api.delete(`/system/settings/${key}`)
-      
-      if (!response.success) {
-        setError(response.error || 'Erreur lors de la suppression du paramètre')
-        return false
-      }
-      
+      await api.delete(`/system/settings/${key}`)
       return true
-    } catch (err: any) {
-      setError(err.message || 'Erreur inattendue')
-      return false
+    } catch (err) {
+      const errorMessage = 'Impossible de supprimer le paramètre système'
+      setError(errorMessage)
+      throw new Error(errorMessage)
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
 
   /**
    * Initialise les paramètres système par défaut
    */
-  const initializeDefaults = async (): Promise<boolean> => {
+  const initializeDefaults = useCallback(async (): Promise<boolean> => {
     setLoading(true)
     setError(null)
-    
     try {
-      const response = await api.post('/system/settings/initialize')
-      
-      if (!response.success) {
-        setError(response.error || 'Erreur lors de l\'initialisation des paramètres par défaut')
-        return false
-      }
-      
+      await api.post('/system/settings/initialize-defaults')
       return true
-    } catch (err: any) {
-      setError(err.message || 'Erreur inattendue')
-      return false
+    } catch (err) {
+      const errorMessage = 'Impossible d\'initialiser les paramètres par défaut'
+      setError(errorMessage)
+      throw new Error(errorMessage)
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
 
   /**
    * Exporte tous les paramètres système
    */
-  const exportSettings = async (): Promise<Record<string, unknown> | null> => {
+  const exportSettings = useCallback(async (): Promise<Record<string, unknown>> => {
     setLoading(true)
     setError(null)
-    
     try {
-      const response = await api.get<Record<string, unknown>>('/system/settings/export')
-      
-      if (!response.success) {
-        setError(response.error || 'Erreur lors de l\'export des paramètres')
-        return null
-      }
-      
-      return response.data || null
-    } catch (err: any) {
-      setError(err.message || 'Erreur inattendue')
-      return null
+      const response = await api.get('/system/settings/export')
+      return response.data || {}
+    } catch (err) {
+      const errorMessage = 'Impossible d\'exporter les paramètres système'
+      setError(errorMessage)
+      throw new Error(errorMessage)
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
 
   /**
    * Importe des paramètres système
    */
-  const importSettings = async (settings: Record<string, {
+  const importSettings = useCallback(async (settings: Record<string, {
     value: unknown
     type: SystemSettings['type']
     description?: string
@@ -240,27 +189,24 @@ export function useSystemSettingsApi() {
   }>): Promise<boolean> => {
     setLoading(true)
     setError(null)
-    
     try {
-      const response = await api.post('/system/settings/import', { settings })
-      
-      if (!response.success) {
-        setError(response.error || 'Erreur lors de l\'import des paramètres')
-        return false
-      }
-      
+      await api.post('/system/settings/import', { settings })
       return true
-    } catch (err: any) {
-      setError(err.message || 'Erreur inattendue')
-      return false
+    } catch (err) {
+      const errorMessage = 'Impossible d\'importer les paramètres système'
+      setError(errorMessage)
+      throw new Error(errorMessage)
     } finally {
       setLoading(false)
     }
-  }
+  }, [api])
 
   return {
+    // État
     loading,
     error,
+
+    // Méthodes CRUD
     getAll,
     getByKey,
     getValue,
@@ -269,7 +215,9 @@ export function useSystemSettingsApi() {
     create,
     update,
     setValue,
-    delete: deleteParam,
+    delete: remove,
+
+    // Méthodes utilitaires
     initializeDefaults,
     exportSettings,
     importSettings

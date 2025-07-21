@@ -24,7 +24,7 @@ export function PrivateRoute({ children }: PrivateRouteProps) {
     try {
       setSettingsLoading(true)
       // Récupérer les settings publics (sans auth requise)
-      const data = await settingsService.getPublicSettings()
+      const data = await settingsService.getPublicSettings('default')
       setSettings(data)
     } catch (error) {
       console.error('Erreur lors du chargement des paramètres:', error)

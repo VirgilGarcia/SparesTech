@@ -116,8 +116,8 @@ function AdminCategories() {
   const handleDelete = (id: number, name: string) => {
     // Vérifier si la catégorie a des sous-catégories
 
-    const hasChildren = categoryTree.some(c => c.id === id && c.children.length > 0) || 
-                       categoryTree.some(c => c.children.some(child => child.id === id && child.children.length > 0))
+    const hasChildren = categoryTree.some(c => c.id === id && (c.children || []).length > 0) || 
+                       categoryTree.some(c => (c.children || []).some(child => child.id === id && (child.children || []).length > 0))
     
     if (hasChildren) {
       setError(`Impossible de supprimer la catégorie "${name}" car elle contient des sous-catégories. Veuillez d'abord supprimer ou déplacer les sous-catégories.`)
@@ -168,14 +168,14 @@ function AdminCategories() {
                           (category.description && category.description.toLowerCase().includes(query.toLowerCase()))
       
       // Vérifier aussi dans les enfants
-      const hasMatchingChildren = category.children.some(child => 
+      const hasMatchingChildren = (category.children || []).some(child => 
         filterCategories([child], query).length > 0
       )
       
       return matchesQuery || hasMatchingChildren
     }).map(category => ({
       ...category,
-      children: filterCategories(category.children, query)
+      children: filterCategories((category.children || []), query)
     }))
   }
 
@@ -217,12 +217,12 @@ function AdminCategories() {
                   </svg>
                   Ordre: {category.order_index}
                 </span>
-                {category.children.length > 0 && (
+                {(category.children || []).length > 0 && (
                   <span className="flex items-center gap-1">
                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                       <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10" />
                     </svg>
-                    {category.children.length} sous-catégorie(s)
+                    {(category.children || []).length} sous-catégorie(s)
                   </span>
                 )}
               </div>
@@ -240,7 +240,7 @@ function AdminCategories() {
               </svg>
               Modifier
             </button>
-            {category.children.length > 0 ? (
+            {(category.children || []).length > 0 ? (
               <div className="px-4 py-2 text-gray-400 text-sm font-medium rounded-lg flex items-center gap-2"
                    title="Cette catégorie contient des sous-catégories et ne peut pas être supprimée directement">
                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -263,9 +263,9 @@ function AdminCategories() {
         </div>
 
         {/* Sous-catégories */}
-        {category.children.length > 0 && (
+        {(category.children || []).length > 0 && (
           <div className="ml-4">
-            {renderCategoryTree(category.children, level + 1)}
+            {renderCategoryTree((category.children || []), level + 1)}
           </div>
         )}
       </div>
@@ -280,7 +280,7 @@ function AdminCategories() {
         <option key={category.id} value={category.id}>
           {'—'.repeat(level)} {category.name}
         </option>,
-        ...(renderCategoryOptions(category.children, excludeIds, level + 1) as any[])
+        ...(renderCategoryOptions((category.children || []), excludeIds, level + 1) as any[])
       ];
     }));
   };

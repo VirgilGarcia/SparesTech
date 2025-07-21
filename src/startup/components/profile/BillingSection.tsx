@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react'
 import { CreditCard, FileText, Download } from 'lucide-react'
 import type { User } from '@supabase/supabase-js'
-import { getCustomerInvoices, generateInvoicePdfUrl } from '../../services/billingService'
+import { billingService } from '../../services/billingService'
 import type { Invoice } from '../../../shared/types/billing'
 
 interface BillingSectionProps {
@@ -27,7 +27,7 @@ const BillingSection: React.FC<BillingSectionProps> = ({
       if (hasMarketplaces && user) {
         setLoading(true)
         try {
-          const customerInvoices = await getCustomerInvoices(user.id)
+          const customerInvoices = await billingService.getInvoices()
           setInvoices(customerInvoices)
         } catch (error) {
           console.error('Erreur lors de la récupération des factures:', error)
@@ -43,7 +43,7 @@ const BillingSection: React.FC<BillingSectionProps> = ({
 
   const handleDownloadInvoice = async (invoiceId: string) => {
     try {
-      const pdfUrl = await generateInvoicePdfUrl(invoiceId)
+      const pdfUrl = await billingService.generatePdfUrl(invoiceId)
       // Ouvrir le PDF dans un nouvel onglet
       window.open(pdfUrl, '_blank')
     } catch (error) {

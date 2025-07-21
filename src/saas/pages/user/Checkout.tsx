@@ -78,7 +78,6 @@ function Checkout() {
     try {
       const order = await orderService.createOrder({
         user_id: user!.id,
-        total_amount: getTotalPrice() * 1.2, // Prix TTC
         customer_email: formData.email,
         customer_company: formData.company,
         customer_phone: formData.phone,      

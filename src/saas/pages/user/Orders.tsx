@@ -5,7 +5,7 @@ import { useMarketplaceTheme } from '../../hooks/useMarketplaceTheme'
 import Header from '../../components/layout/Header'
 import { getStatusColor, getStatusLabel, formatDate, formatPrice } from '../../utils/orderUtils'
 import { userOrderService } from '../../services/userOrderService'
-import type { Order } from '../../../shared/types/order'
+import type { Order } from '../../../hooks/api/useOrderApi'
 
 function Orders() {
   const { user } = useAuth()
@@ -110,7 +110,7 @@ function Orders() {
               <div 
                 key={order.id} 
                 className="bg-white rounded-lg border border-gray-100 hover:shadow-lg transition-all duration-300 cursor-pointer"
-                onClick={() => handleViewOrder(order.id)}
+                onClick={() => handleViewOrder(order.id.toString())}
               >
                 <div className="p-6">
                   <div className="flex items-center justify-between mb-6">
@@ -149,7 +149,7 @@ function Orders() {
                             color: theme.primaryColor 
                           }}
                         >
-                          {item.product?.name} × {item.quantity}
+                          {(item as any).product?.name || item.product_name} × {item.quantity}
                         </span>
                       ))}
                       {(order.order_items?.length || 0) > 3 && (

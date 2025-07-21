@@ -29,7 +29,7 @@ function Login() {
   const loadSettings = async () => {
     try {
       setSettingsLoading(true)
-      const data = await settingsService.getPublicSettings()
+      const data = await settingsService.getPublicSettings('tenant')
       setSettings(data)
     } catch (error) {
       console.error('Erreur lors du chargement des paramètres:', error)

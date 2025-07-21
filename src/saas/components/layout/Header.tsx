@@ -1,9 +1,9 @@
-import { useState, useEffect, useCallback } from 'react'
+import { useState, useEffect } from 'react'
 import { Link, useLocation } from 'react-router-dom'
 import { useAuth } from '../../../shared/context/AuthContext'
 import { useMarketplaceTheme } from '../../../shared/context/ThemeContext'
 import { useCart } from '../../../shared/context/CartContext'
-import { supabase } from '../../../lib/supabase'
+import { useUserRole } from '../../../shared/hooks/useUserRole'
 import { categoryService } from '../../services/categoryService'
 
 function Header() {
@@ -13,29 +13,9 @@ function Header() {
   const location = useLocation()
   const [showUserMenu, setShowUserMenu] = useState(false)
   const [showMobileMenu, setShowMobileMenu] = useState(false)
-  const [userRole, setUserRole] = useState<string | null>(null)
+  const { userRole } = useUserRole()
 
-  const loadUserRole = useCallback(async () => {
-    if (!user) return
-    
-    try {
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (error) {
-        console.error('Erreur lors du chargement du rôle:', error)
-        setUserRole('client')
-      } else {
-        setUserRole(data.role)
-      }
-    } catch (error) {
-      console.error('Erreur lors du chargement du rôle:', error)
-      setUserRole('client')
-    }
-  }, [user])
+// Le rôle utilisateur est maintenant géré par useUserRole hook
 
   const loadCategories = async () => {
     try {
@@ -45,14 +25,7 @@ function Header() {
     }
   }
 
-  // Charger le rôle de l'utilisateur quand il se connecte
-  useEffect(() => {
-    if (user) {
-      loadUserRole()
-    } else {
-      setUserRole(null)
-    }
-  }, [user, loadUserRole])
+  // Le rôle utilisateur est maintenant géré automatiquement par le hook
 
   // Charger les catégories
   useEffect(() => {
@@ -62,7 +35,7 @@ function Header() {
   const handleLogout = async () => {
     try {
       await signOut()
-      setUserRole(null)
+      // userRole is managed by useUserRole hook
       setShowUserMenu(false)
     } catch (error) {
       console.error('Erreur lors de la déconnexion:', error)

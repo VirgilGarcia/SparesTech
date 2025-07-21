@@ -53,7 +53,7 @@ function CategoryBreadcrumb({
       const breadcrumb: Category[] = []
       
       for (const categoryName of categoryNames) {
-        const category = allCategories.find(cat => cat.name === categoryName)
+        const category = allCategories.find((cat: any) => cat.name === categoryName)
         if (category) {
           breadcrumb.push(category)
         }

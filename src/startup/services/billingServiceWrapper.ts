@@ -6,16 +6,21 @@ export const billingService = {
   // TODO: Migrer vers des hooks API dédiés quand ce module sera prioritaire
   
   getInvoices: async () => {
+    console.warn('Service de facturation non encore migré vers l\'API - retour de données vides')
+    return []
+  },
+
+  getInvoiceById: async (_id: string) => {
+    console.warn('Service de facturation non encore migré vers l\'API - retour de données vides')
+    return null
+  },
+
+  createInvoice: async (_data: any) => {
     throw new Error('Service de facturation non encore migré vers l\'API - utiliser le backend directement')
   },
 
-  getInvoiceById: async () => {
-    throw new Error('Service de facturation non encore migré vers l\'API - utiliser le backend directement')
-  },
-
-  createInvoice: async () => {
-    throw new Error('Service de facturation non encore migré vers l\'API - utiliser le backend directement')
-  },
-
-  // Autres méthodes... (à implémenter quand nécessaire)
+  generatePdfUrl: async (_invoiceId: string) => {
+    console.warn('Service de facturation non encore migré vers l\'API - génération PDF non disponible')
+    throw new Error('Génération de factures PDF non encore disponible - service en migration')
+  }
 }

@@ -343,7 +343,12 @@ export class ProductService {
           description,
           price,
           stock_quantity,
+          tenant_id,
+          is_visible,
+          is_sellable,
           featured_image_url,
+          created_at,
+          updated_at,
           product_categories (
             category_id,
             categories (id, name)

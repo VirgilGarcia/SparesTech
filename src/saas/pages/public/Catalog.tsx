@@ -6,7 +6,8 @@ import { useMarketplaceTheme } from '../../hooks/useMarketplaceTheme'
 import { useAuth } from '../../../shared/context/AuthContext'
 import { productService } from '../../services/productService'
 import { categoryService } from '../../services/categoryService'
-import { supabase } from '../../../lib/supabase'
+import { useUserRole } from '../../../shared/hooks/useUserRole'
+import { useProductFieldApi } from '../../../hooks/api/useProductFieldApi'
 import ProductCard from '../../components/product/ProductCard'
 import CategoryNavigation from '../../components/category/CategoryNavigation'
 import CategoryBreadcrumb from '../../components/category/CategoryBreadcrumb'
@@ -19,7 +20,7 @@ import type { CategoryTree } from '../../services/categoryService'
 function Catalog() {
   const { addToCart } = useCart()
   const { display, theme } = useMarketplaceTheme()
-  const { user } = useAuth()
+  const { } = useAuth() // user removed as it's not used anymore
   const [searchParams, setSearchParams] = useSearchParams()
   
   // États de pagination
@@ -32,7 +33,8 @@ function Catalog() {
   const [loading, setLoading] = useState(true)
   const [searchQuery, setSearchQuery] = useState('')
   const [selectedCategoryId, setSelectedCategoryId] = useState<number | null>(null)
-  const [userRole, setUserRole] = useState<string | null>(null)
+  const { userRole } = useUserRole() // roleLoading removed as it's not used
+  const { getProductFieldValues } = useProductFieldApi()
   const [showSidebar, setShowSidebar] = useState(true)
   const [fieldValues, setFieldValues] = useState<{ [productId: string]: { [fieldName: string]: string } }>({})
 
@@ -68,8 +70,8 @@ function Catalog() {
               if (cat.id === targetId) {
                 return cat.path
               }
-              if (cat.children.length > 0) {
-                const childPath = findCategoryPath(cat.children, targetId)
+              if ((cat.children || []).length > 0) {
+                const childPath = findCategoryPath(cat.children || [], targetId)
                 if (childPath) return childPath
               }
             }
@@ -104,30 +106,7 @@ function Catalog() {
     loadProducts()
   }, [currentPage, selectedCategoryId, searchQuery])
 
-  // Charger le rôle utilisateur
-  useEffect(() => {
-    const loadUserRole = async () => {
-      if (!user) {
-        setUserRole(null)
-        return
-      }
-
-      try {
-        const { data: profile } = await supabase
-          .from('user_profiles')
-          .select('role')
-          .eq('id', user.id)
-          .single()
-
-        setUserRole(profile?.role || null)
-      } catch (error) {
-        console.error('Erreur lors du chargement du rôle:', error)
-        setUserRole(null)
-      }
-    }
-
-    loadUserRole()
-  }, [user])
+  // Le rôle utilisateur est maintenant géré par useUserRole hook
 
   const loadProducts = async () => {
     try {
@@ -147,11 +126,11 @@ function Catalog() {
         sortOrder: 'asc' as const
       }
       const response = await productService.getVisibleProductsPaginated(params)
-      setProducts(response.data)
+      setProducts(response.products)
       setTotalItems(response.total)
-      setTotalPages(response.totalPages)
-      if (response.data.length > 0) {
-        await loadFieldValues(response.data)
+      setTotalPages(Math.ceil(response.total / (params.limit || 12)))
+      if (response.products.length > 0) {
+        await loadFieldValues(response.products)
       }
     } catch (error) {
       console.error('Erreur lors du chargement des produits:', error)
@@ -162,34 +141,26 @@ function Catalog() {
 
   const loadFieldValues = async (products: Product[]) => {
     try {
-      const productIds = products.map(p => p.id)
-      if (productIds.length === 0) return
-
-      const { data, error } = await supabase
-        .from('product_field_values')
-        .select(`
-          *,
-          product_fields (
-            id,
-            name,
-            label,
-            type,
-            options
-          )
-        `)
-        .in('product_id', productIds)
-
-      if (error) throw error
-
       const values: { [productId: string]: { [fieldName: string]: string } } = {}
-      data?.forEach(fv => {
-        if (fv.product_fields) {
-          if (!values[fv.product_id]) {
-            values[fv.product_id] = {}
+
+      // Charger les valeurs de champs pour chaque produit via l'API
+      await Promise.all(
+        products.map(async (product) => {
+          try {
+            const fieldValues = await getProductFieldValues(product.id)
+            values[product.id] = {}
+            
+            fieldValues.forEach(fv => {
+              if (fv.product_fields) {
+                values[product.id][fv.product_fields.name] = fv.value
+              }
+            })
+          } catch (error) {
+            console.error(`Erreur lors du chargement des champs du produit ${product.id}:`, error)
+            values[product.id] = {}
           }
-          values[fv.product_id][fv.product_fields.name] = fv.value
-        }
-      })
+        })
+      )
 
       setFieldValues(values)
     } catch (error) {
@@ -273,8 +244,8 @@ function Catalog() {
       const findCategory = (categories: CategoryTree[], targetId: number): CategoryTree | null => {
         for (const cat of categories) {
           if (cat.id === targetId) return cat
-          if (cat.children.length > 0) {
-            const found = findCategory(cat.children, targetId)
+          if ((cat.children || []).length > 0) {
+            const found = findCategory(cat.children || [], targetId)
             if (found) return found
           }
         }
@@ -284,7 +255,7 @@ function Catalog() {
     })() : null
 
   // Déterminer ce qu'il faut afficher - logique simplifiée
-  const hasSubcategories = selectedCategory && selectedCategory.children.length > 0
+  const hasSubcategories = selectedCategory && (selectedCategory.children || []).length > 0
   
   // Toujours afficher les sous-catégories ET les produits
   const showProductsSection = true
@@ -302,11 +273,11 @@ function Catalog() {
               <h1 className="text-3xl font-light text-gray-900 mb-2">Catalogue</h1>
               <p className="text-gray-600">
                 {showProductsSection && showSubcategoriesSection 
-                  ? `${totalItems} produit${totalItems > 1 ? 's' : ''} et ${selectedCategory?.children.length || 0} sous-catégorie${selectedCategory?.children.length !== 1 ? 's' : ''}`
+                  ? `${totalItems} produit${totalItems > 1 ? 's' : ''} et ${(selectedCategory?.children || []).length} sous-catégorie${(selectedCategory?.children || []).length !== 1 ? 's' : ''}`
                   : showProductsSection 
                     ? `${totalItems} produit${totalItems > 1 ? 's' : ''} trouvé${totalItems > 1 ? 's' : ''}`
                     : showSubcategoriesSection 
-                      ? `${selectedCategory?.children.length || 0} sous-catégorie${selectedCategory?.children.length !== 1 ? 's' : ''}`
+                      ? `${(selectedCategory?.children || []).length} sous-catégorie${(selectedCategory?.children || []).length !== 1 ? 's' : ''}`
                       : 'Aucun produit trouvé'
                 }
               </p>
@@ -378,7 +349,7 @@ function Catalog() {
               <>
                 <div className="mb-8">
                   <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                    {selectedCategory.children.map((subCategory) => (
+                    {(selectedCategory.children || []).map((subCategory) => (
                       <div
                         key={subCategory.id}
                         onClick={() => handleCategorySelect(subCategory.id)}

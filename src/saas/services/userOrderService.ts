@@ -3,7 +3,7 @@
 
 // Réexport du wrapper qui utilise l'API backend
 import { orderService } from './orderServiceWrapper'
-import type { Order } from '../../shared/types/order'
+import type { Order } from '../../hooks/api/useOrderApi'
 
 export const userOrderService = {
   // Récupérer les commandes d'un utilisateur (MIGRÉ vers API)

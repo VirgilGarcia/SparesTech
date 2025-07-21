@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Request, Response } from 'express'
 import { body, param, query } from 'express-validator'
 import { validate } from '../../middleware/validation'
 import { requireAuth, requireTenantAccess, AuthenticatedRequest } from '../../middleware/auth'
@@ -25,27 +25,31 @@ router.get('/:tenantId/products',
     query('sort_by').optional().isIn(['name', 'reference', 'price', 'stock_quantity', 'created_at']),
     query('sort_order').optional().isIn(['asc', 'desc'])
   ]),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const { tenantId } = req.params
+      if (!tenantId) {
+        return res.status(400).json({ success: false, error: 'ID du tenant requis' })
+      }
       const queryParams = req.query
 
-      const result = await ProductService.getProducts(tenantId, {
-        page: queryParams.page ? parseInt(queryParams.page as string) : undefined,
-        limit: queryParams.limit ? parseInt(queryParams.limit as string) : undefined,
-        search: queryParams.search as string,
-        category_id: queryParams.category_id ? parseInt(queryParams.category_id as string) : undefined,
-        is_visible: queryParams.is_visible ? queryParams.is_visible === 'true' : undefined,
-        is_sellable: queryParams.is_sellable ? queryParams.is_sellable === 'true' : undefined,
-        sort_by: queryParams.sort_by as string,
-        sort_order: queryParams.sort_order as 'asc' | 'desc'
-      })
+      const filters: any = {}
+      if (queryParams.page) filters.page = parseInt(queryParams.page as string)
+      if (queryParams.limit) filters.limit = parseInt(queryParams.limit as string)  
+      if (queryParams.search) filters.search = queryParams.search as string
+      if (queryParams.category_id) filters.category_id = parseInt(queryParams.category_id as string)
+      if (queryParams.is_visible !== undefined) filters.is_visible = queryParams.is_visible === 'true'
+      if (queryParams.is_sellable !== undefined) filters.is_sellable = queryParams.is_sellable === 'true'
+      if (queryParams.sort_by) filters.sort_by = queryParams.sort_by as string
+      if (queryParams.sort_order) filters.sort_order = queryParams.sort_order as 'asc' | 'desc'
 
-      res.json(result)
+      const result = await ProductService.getProducts(tenantId, filters)
+
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API récupération produits', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -67,25 +71,30 @@ router.get('/:tenantId/products/public',
     query('min_price').optional().isFloat({ min: 0 }),
     query('max_price').optional().isFloat({ min: 0 })
   ]),
-  async (req, res) => {
+  async (req: Request, res: Response): Promise<Response | void> => {
     try {
       const { tenantId } = req.params
       const queryParams = req.query
 
-      const result = await ProductService.searchPublicProducts(tenantId, {
-        page: queryParams.page ? parseInt(queryParams.page as string) : undefined,
-        limit: queryParams.limit ? parseInt(queryParams.limit as string) : undefined,
-        search: queryParams.search as string,
-        category_id: queryParams.category_id ? parseInt(queryParams.category_id as string) : undefined,
-        min_price: queryParams.min_price ? parseFloat(queryParams.min_price as string) : undefined,
-        max_price: queryParams.max_price ? parseFloat(queryParams.max_price as string) : undefined
-      })
+      if (!tenantId) {
+        return res.status(400).json({ success: false, error: 'ID du tenant requis' })
+      }
 
-      res.json(result)
+      const searchParams: any = {}
+      if (queryParams.page) searchParams.page = parseInt(queryParams.page as string)
+      if (queryParams.limit) searchParams.limit = parseInt(queryParams.limit as string)
+      if (queryParams.search) searchParams.search = queryParams.search as string
+      if (queryParams.category_id) searchParams.category_id = parseInt(queryParams.category_id as string)
+      if (queryParams.min_price) searchParams.min_price = parseFloat(queryParams.min_price as string)
+      if (queryParams.max_price) searchParams.max_price = parseFloat(queryParams.max_price as string)
+
+      const result = await ProductService.searchPublicProducts(tenantId, searchParams)
+
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API recherche produits publics', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -102,20 +111,23 @@ router.get('/:tenantId/products/:productId',
     param('tenantId').isUUID(),
     param('productId').isUUID()
   ]),
-  async (req, res) => {
+  async (req: Request, res: Response): Promise<Response | void> => {
     try {
       const { tenantId, productId } = req.params
+      if (!tenantId || !productId) {
+        return res.status(400).json({ success: false, error: 'ID du tenant et du produit requis' })
+      }
       const result = await ProductService.getProductById(tenantId, productId)
 
       if (!result.success) {
         return res.status(404).json(result)
       }
 
-      res.json(result)
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API récupération produit', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -141,9 +153,12 @@ router.post('/:tenantId/products',
     body('is_sellable').optional().isBoolean(),
     body('featured_image_url').optional().isURL()
   ]),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const { tenantId } = req.params
+      if (!tenantId) {
+        return res.status(400).json({ success: false, error: 'ID du tenant requis' })
+      }
       const productData = req.body
 
       const result = await ProductService.createProduct(tenantId, productData)
@@ -158,11 +173,11 @@ router.post('/:tenantId/products',
         userId: req.user.id 
       })
 
-      res.status(201).json(result)
+      return res.status(201).json(result)
 
     } catch (error: any) {
       logger.error('Erreur API création produit', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -189,9 +204,12 @@ router.put('/:tenantId/products/:productId',
     body('is_sellable').optional().isBoolean(),
     body('featured_image_url').optional().isURL()
   ]),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const { tenantId, productId } = req.params
+      if (!tenantId || !productId) {
+        return res.status(400).json({ success: false, error: 'ID du tenant et du produit requis' })
+      }
       const updates = req.body
 
       const result = await ProductService.updateProduct(tenantId, productId, updates)
@@ -200,11 +218,11 @@ router.put('/:tenantId/products/:productId',
         return res.status(400).json(result)
       }
 
-      res.json(result)
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API mise à jour produit', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -223,9 +241,12 @@ router.delete('/:tenantId/products/:productId',
     param('tenantId').isUUID(),
     param('productId').isUUID()
   ]),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const { tenantId, productId } = req.params
+      if (!tenantId || !productId) {
+        return res.status(400).json({ success: false, error: 'ID du tenant et du produit requis' })
+      }
 
       const result = await ProductService.deleteProduct(tenantId, productId)
 
@@ -233,11 +254,11 @@ router.delete('/:tenantId/products/:productId',
         return res.status(400).json(result)
       }
 
-      res.json(result)
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API suppression produit', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })

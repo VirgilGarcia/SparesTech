@@ -1,5 +1,4 @@
-import { useProductApi } from '../../hooks/api/useProductApi'
-import { useProductFieldApi } from '../../hooks/api/useProductFieldApi'
+import { productApiClient, productFieldApiClient } from '../../lib/apiClients'
 import type {
   Product,
   CreateProductData,
@@ -11,6 +10,7 @@ import type { ProductField } from '../../hooks/api/useProductFieldApi'
 /**
  * Service wrapper pour la gestion des produits
  * Route les appels critiques vers l'API backend pour éviter les problèmes RLS
+ * ✅ CORRIGÉ - Utilise des API clients au lieu de hooks React
  */
 
 // Interfaces pour compatibilité avec l'ancien service
@@ -24,8 +24,11 @@ export interface ProductDisplay {
 export interface ProductFieldDisplay {
   id: string
   name: string
+  field_name: string
   label: string
+  display_name: string
   type: ProductField['type']
+  field_type: string
   required: boolean
   options?: string[]
   default_value?: string
@@ -45,8 +48,7 @@ export const productService = {
     totalCount: number
   }> => {
     try {
-      const api = useProductApi()
-      const result = await api.getAll(filter)
+      const result = await productApiClient.getAll(filter)
       return {
         products: result.data || [],
         totalCount: result.total || 0
@@ -65,8 +67,7 @@ export const productService = {
    */
   getProductById: async (id: string): Promise<Product | null> => {
     try {
-      const api = useProductApi()
-      return api.getById(id)
+      return await productApiClient.getById(id)
     } catch (error) {
       console.error('Erreur lors de la récupération du produit:', error)
       return null
@@ -78,8 +79,10 @@ export const productService = {
    */
   getProductByReference: async (reference: string): Promise<Product | null> => {
     try {
-      const api = useProductApi()
-      return api.getByReference(reference)
+      // Utiliser un filtre pour chercher par référence
+      const result = await productApiClient.getAll({ search: reference })
+      const product = result.data.find(p => p.reference === reference)
+      return product || null
     } catch (error) {
       console.error('Erreur lors de la récupération du produit:', error)
       return null
@@ -90,8 +93,7 @@ export const productService = {
    * Crée un nouveau produit
    */
   createProduct: async (data: CreateProductData): Promise<Product> => {
-    const api = useProductApi()
-    const result = await api.create(data)
+    const result = await productApiClient.create(data)
     if (!result) {
       throw new Error('Impossible de créer le produit')
     }
@@ -102,8 +104,7 @@ export const productService = {
    * Met à jour un produit
    */
   updateProduct: async (id: string, data: UpdateProductData): Promise<Product> => {
-    const api = useProductApi()
-    const result = await api.update(id, data)
+    const result = await productApiClient.update(id, data)
     if (!result) {
       throw new Error('Impossible de mettre à jour le produit')
     }
@@ -114,148 +115,118 @@ export const productService = {
    * Supprime un produit
    */
   deleteProduct: async (id: string): Promise<boolean> => {
-    try {
-      const api = useProductApi()
-      return api.remove(id)
-    } catch (error) {
-      console.error('Erreur lors de la suppression du produit:', error)
-      return false
-    }
+    return await productApiClient.delete(id)
   },
 
   /**
-   * Upload d'une image produit
+   * Récupère les produits visibles avec pagination
    */
-  uploadProductImage: async (productId: string, file: File): Promise<string> => {
-    const api = useProductApi()
-    return api.uploadImage(productId, file)
-  },
-
-  /**
-   * Recherche de produits
-   */
-  searchProducts: async (query: string, filters?: Omit<ProductFilter, 'search'>): Promise<Product[]> => {
-    try {
-      const api = useProductApi()
-      const result = await api.search(query, filters)
-      return result.data || []
-    } catch (error) {
-      console.error('Erreur lors de la recherche:', error)
-      return []
-    }
-  },
-
-  /**
-   * Récupère les produits par catégorie
-   */
-  getProductsByCategory: async (categoryId: number): Promise<Product[]> => {
-    try {
-      const api = useProductApi()
-      const result = await api.getByCategory(categoryId)
-      return result.data || []
-    } catch (error) {
-      console.error('Erreur lors de la récupération des produits:', error)
-      return []
-    }
-  },
-
-  /**
-   * Récupère les produits visibles (pour le catalogue public)
-   */
-  getVisibleProducts: async (filters?: Omit<ProductFilter, 'visible'>): Promise<Product[]> => {
-    try {
-      const api = useProductApi()
-      const result = await api.getVisible(filters)
-      return result.data || []
-    } catch (error) {
-      console.error('Erreur lors de la récupération des produits:', error)
-      return []
-    }
-  },
-
-  /**
-   * Met à jour le stock d'un produit
-   */
-  updateProductStock: async (id: string, newStock: number): Promise<Product | null> => {
-    try {
-      const api = useProductApi()
-      return api.updateStock(id, newStock)
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour du stock:', error)
-      return null
-    }
-  },
-
-  /**
-   * Met à jour la visibilité d'un produit
-   */
-  updateProductVisibility: async (id: string, visible: boolean): Promise<Product | null> => {
-    try {
-      const api = useProductApi()
-      return api.updateVisibility(id, visible)
-    } catch (error) {
-      console.error('Erreur lors de la mise à jour de la visibilité:', error)
-      return null
-    }
-  },
-
-  /**
-   * Récupère les statistiques des produits
-   */
-  getProductStats: async (): Promise<{
+  getVisibleProductsPaginated: async (params: {
+    page?: number
+    limit?: number
+    search?: string
+    categoryId?: number
+    categoryIds?: number[]
+    sortBy?: string
+    sortOrder?: 'asc' | 'desc'
+  }): Promise<{
+    products: Product[]
     total: number
-    visible: number
-    inStock: number
-    lowStock: number
-    totalValue: number
   }> => {
     try {
-      const api = useProductApi()
-      return api.getStats()
-    } catch (error) {
-      console.error('Erreur lors de la récupération des statistiques:', error)
+      const filter: ProductFilter = {
+        page: params.page,
+        limit: params.limit,
+        search: params.search,
+        category_id: params.categoryId,
+        sort_by: params.sortBy,
+        sort_order: params.sortOrder
+      }
+      
+      const result = await productApiClient.getAll(filter)
       return {
-        total: 0,
-        visible: 0,
-        inStock: 0,
-        lowStock: 0,
-        totalValue: 0
+        products: result.data,
+        total: result.total
+      }
+    } catch (error) {
+      console.error('Erreur lors de la récupération des produits paginés:', error)
+      return {
+        products: [],
+        total: 0
       }
     }
   },
 
   /**
-   * Export de produits
+   * Ajoute un nouveau produit
    */
-  exportProducts: async (format: 'csv' | 'json' = 'csv'): Promise<Blob> => {
-    const api = useProductApi()
-    return api.exportProducts(format)
+  addProduct: async (productData: CreateProductData): Promise<Product | null> => {
+    try {
+      return await productApiClient.create(productData)
+    } catch (error) {
+      console.error('Erreur lors de la création du produit:', error)
+      return null
+    }
   },
 
   /**
-   * Import de produits
+   * Récupère tous les produits (alias pour compatibilité)
    */
-  importProducts: async (file: File): Promise<{
-    success: number
-    errors: string[]
-  }> => {
-    const api = useProductApi()
-    return api.importProducts(file)
+  getAllProducts: async (filter?: ProductFilter): Promise<Product[]> => {
+    try {
+      const result = await productApiClient.getAll(filter)
+      return result.data
+    } catch (error) {
+      console.error('Erreur lors de la récupération de tous les produits:', error)
+      return []
+    }
+  },
+
+  /**
+   * Récupère les valeurs des champs personnalisés d'un produit
+   */
+  getProductFieldValues: async (productId: string): Promise<any[]> => {
+    try {
+      return await productFieldApiClient.getProductFieldValues(productId)
+    } catch (error) {
+      console.error('Erreur lors de la récupération des valeurs des champs:', error)
+      return []
+    }
+  },
+
+  /**
+   * Met à jour une valeur de champ personnalisé
+   */
+  setProductFieldValue: async (productId: string, fieldId: string, value: string): Promise<boolean> => {
+    try {
+      return await productFieldApiClient.setProductFieldValue(productId, fieldId, value)
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du champ:', error)
+      return false
+    }
+  },
+
+  /**
+   * Récupère les champs disponibles
+   */
+  getProductFields: async (): Promise<ProductField[]> => {
+    try {
+      return await productFieldApiClient.getAll()
+    } catch (error) {
+      console.error('Erreur lors de la récupération des champs:', error)
+      return []
+    }
   }
 }
 
-/**
- * Service pour la gestion des champs de produits
- */
+// Interface pour un service de gestion des champs produits
 export const productFieldService = {
-  
   /**
    * Récupère tous les champs de produits
    */
-  getProductFields: async (activeOnly = true): Promise<ProductField[]> => {
+  getAllFields: async (): Promise<ProductField[]> => {
     try {
-      const api = useProductFieldApi()
-      return api.getAll(activeOnly)
+      return await productFieldApiClient.getAll()
     } catch (error) {
       console.error('Erreur lors de la récupération des champs:', error)
       return []
@@ -263,58 +234,160 @@ export const productFieldService = {
   },
 
   /**
-   * Récupère un champ par ID
+   * Récupère tous les champs avec affichage formaté
    */
-  getProductFieldById: async (id: string): Promise<ProductField | null> => {
+  getAllFieldDisplay: async (): Promise<ProductFieldDisplay[]> => {
     try {
-      const api = useProductFieldApi()
-      return api.getById(id)
+      const fields = await productFieldApiClient.getAll()
+      return fields.map(field => ({
+        id: field.id,
+        name: field.name,
+        field_name: field.name,
+        label: field.label,
+        display_name: field.label,
+        type: field.type,
+        field_type: field.type,
+        required: field.required,
+        options: field.options,
+        default_value: field.default_value,
+        active: field.active || true,
+        system: field.system || false,
+        catalog_order: field.catalog_order || 0,
+        product_order: field.product_order || 0
+      }))
     } catch (error) {
-      console.error('Erreur lors de la récupération du champ:', error)
-      return null
+      console.error('Erreur lors de la récupération des champs formatés:', error)
+      return []
     }
   },
 
   /**
-   * Crée un nouveau champ
+   * Initialise les champs système
    */
-  createProductField: async (data: {
+  initializeSystemFields: async (): Promise<boolean> => {
+    try {
+      const systemFields = await productFieldApiClient.getSystemFields()
+      return systemFields.length > 0
+    } catch (error) {
+      console.error('Erreur lors de l\'initialisation des champs système:', error)
+      return false
+    }
+  },
+
+  /**
+   * Vérifie si les champs système existent
+   */
+  hasSystemFields: async (): Promise<boolean> => {
+    try {
+      const systemFields = await productFieldApiClient.getSystemFields()
+      return systemFields.length > 0
+    } catch (error) {
+      console.error('Erreur lors de la vérification des champs système:', error)
+      return false
+    }
+  },
+
+  /**
+   * Corrige les valeurs d\'ordre des champs
+   */
+  fixOrderValues: async (): Promise<boolean> => {
+    try {
+      const fields = await productFieldApiClient.getAll()
+      const reorderData = fields.map((field, index) => ({
+        id: field.id,
+        order: index + 1
+      }))
+      return await productFieldApiClient.reorder(reorderData)
+    } catch (error) {
+      console.error('Erreur lors de la correction des ordres:', error)
+      return false
+    }
+  },
+
+  /**
+   * Valide un nom de champ
+   */
+  validateFieldName: async (name: string): Promise<boolean> => {
+    try {
+      if (!name || name.trim().length === 0) return false
+      const existingField = await productFieldApiClient.getByName(name)
+      return existingField === null
+    } catch (error) {
+      console.error('Erreur lors de la validation du nom:', error)
+      return false
+    }
+  },
+
+  /**
+   * Valide un label de champ
+   */
+  validateFieldLabel: async (label: string): Promise<boolean> => {
+    try {
+      return !!(label && label.trim().length > 0)
+    } catch (error) {
+      console.error('Erreur lors de la validation du label:', error)
+      return false
+    }
+  },
+
+  /**
+   * Ajoute un nouveau champ
+   */
+  addField: async (fieldData: {
     name: string
     label: string
     type: ProductField['type']
     required?: boolean
     options?: string[]
-    default_value?: string
-  }): Promise<ProductField> => {
-    const api = useProductFieldApi()
-    const result = await api.create(data)
-    if (!result) {
-      throw new Error('Impossible de créer le champ')
+  }): Promise<ProductField | null> => {
+    try {
+      return await productFieldApiClient.create(fieldData)
+    } catch (error) {
+      console.error('Erreur lors de l\'ajout du champ:', error)
+      return null
     }
-    return result
   },
 
   /**
    * Met à jour un champ
    */
-  updateProductField: async (id: string, data: Partial<ProductField>): Promise<ProductField> => {
-    const api = useProductFieldApi()
-    const result = await api.update(id, data)
-    if (!result) {
-      throw new Error('Impossible de mettre à jour le champ')
+  updateField: async (id: string, updates: Partial<ProductField>): Promise<ProductField | null> => {
+    try {
+      return await productFieldApiClient.update(id, updates)
+    } catch (error) {
+      console.error('Erreur lors de la mise à jour du champ:', error)
+      return null
     }
-    return result
   },
 
   /**
-   * Supprime un champ
+   * Met à jour l\'affichage des champs
    */
-  deleteProductField: async (id: string): Promise<boolean> => {
+  updateFieldDisplay: async (displayData: ProductFieldDisplay[]): Promise<boolean> => {
     try {
-      const api = useProductFieldApi()
-      return api.remove(id)
+      for (const display of displayData) {
+        await productFieldApiClient.update(display.id, {
+          catalog_order: display.catalog_order,
+          product_order: display.product_order,
+          active: display.active
+        })
+      }
+      return true
     } catch (error) {
-      console.error('Erreur lors de la suppression du champ:', error)
+      console.error('Erreur lors de la mise à jour de l\'affichage:', error)
+      return false
+    }
+  },
+
+  /**
+   * Restaure un champ
+   */
+  restoreField: async (id: string): Promise<boolean> => {
+    try {
+      const updated = await productFieldApiClient.update(id, { active: true })
+      return updated !== null
+    } catch (error) {
+      console.error('Erreur lors de la restauration du champ:', error)
       return false
     }
   },
@@ -322,65 +395,16 @@ export const productFieldService = {
   /**
    * Réorganise les champs
    */
-  reorderProductFields: async (fields: Array<{ id: string, order: number }>): Promise<boolean> => {
+  reorderFields: async (fieldIds: string[]): Promise<boolean> => {
     try {
-      const api = useProductFieldApi()
-      return api.reorder(fields)
+      const reorderData = fieldIds.map((id, index) => ({
+        id,
+        order: index + 1
+      }))
+      return await productFieldApiClient.reorder(reorderData)
     } catch (error) {
-      console.error('Erreur lors de la réorganisation:', error)
+      console.error('Erreur lors de la réorganisation des champs:', error)
       return false
-    }
-  },
-
-  /**
-   * Récupère les champs système
-   */
-  getSystemFields: async (): Promise<ProductField[]> => {
-    try {
-      const api = useProductFieldApi()
-      return api.getSystemFields()
-    } catch (error) {
-      console.error('Erreur lors de la récupération des champs système:', error)
-      return []
-    }
-  },
-
-  /**
-   * Récupère les champs personnalisés
-   */
-  getCustomFields: async (): Promise<ProductField[]> => {
-    try {
-      const api = useProductFieldApi()
-      return api.getCustomFields()
-    } catch (error) {
-      console.error('Erreur lors de la récupération des champs personnalisés:', error)
-      return []
-    }
-  },
-
-  /**
-   * Récupère les champs ordonnés pour le catalogue
-   */
-  getCatalogFields: async (): Promise<ProductField[]> => {
-    try {
-      const api = useProductFieldApi()
-      return api.getCatalogFields()
-    } catch (error) {
-      console.error('Erreur lors de la récupération des champs du catalogue:', error)
-      return []
-    }
-  },
-
-  /**
-   * Récupère les champs ordonnés pour l'édition de produit
-   */
-  getProductEditFields: async (): Promise<ProductField[]> => {
-    try {
-      const api = useProductFieldApi()
-      return api.getProductEditFields()
-    } catch (error) {
-      console.error('Erreur lors de la récupération des champs d\'édition:', error)
-      return []
     }
   }
 }
@@ -388,8 +412,10 @@ export const productFieldService = {
 // Export des types pour compatibilité
 export type {
   Product,
-  ProductField,
   CreateProductData,
   UpdateProductData,
-  ProductFilter
+  ProductFilter,
+  ProductField,
+  ProductDisplay,
+  ProductFieldDisplay
 }

@@ -115,7 +115,7 @@ function DomainRouter() {
   // Marketplace client - Application complète
   return (
     <TenantProvider>
-      <MarketplaceProvider tenantId={domainInfo.tenantId}>
+      <MarketplaceProvider tenantId={domainInfo.tenantId || undefined}>
         <CartProvider>
           <Routes>
       {/* Pages publiques */}

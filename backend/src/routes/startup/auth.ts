@@ -1,4 +1,4 @@
-import { Router } from 'express'
+import { Router, Response } from 'express'
 import { body } from 'express-validator'
 import { validate } from '../../middleware/validation'
 import { requireAuth, AuthenticatedRequest } from '../../middleware/auth'
@@ -20,7 +20,7 @@ router.post('/profile',
     body('company_name').optional().trim().isLength({ max: 100 }),
     body('phone').optional().trim().isMobilePhone('any')
   ]),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const { email, first_name, last_name, company_name, phone } = req.body
       const userId = req.user.id
@@ -39,11 +39,11 @@ router.post('/profile',
 
       logger.info('Profil startup créé/récupéré via API', { userId, email })
 
-      res.json(result)
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API profil startup', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -57,7 +57,7 @@ router.post('/profile',
  */
 router.get('/profile',
   requireAuth,
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const userId = req.user.id
       const result = await StartupUserService.getById(userId)
@@ -66,11 +66,11 @@ router.get('/profile',
         return res.status(404).json(result)
       }
 
-      res.json(result)
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API récupération profil startup', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })
@@ -94,7 +94,7 @@ router.put('/profile',
     body('postal_code').optional().trim().isLength({ max: 10 }),
     body('country').optional().trim().isLength({ max: 100 })
   ]),
-  async (req: AuthenticatedRequest, res) => {
+  async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const userId = req.user.id
       const updates = req.body
@@ -105,11 +105,11 @@ router.put('/profile',
         return res.status(400).json(result)
       }
 
-      res.json(result)
+      return res.json(result)
 
     } catch (error: any) {
       logger.error('Erreur API mise à jour profil startup', { error: error.message })
-      res.status(500).json({
+      return res.status(500).json({
         success: false,
         error: 'Erreur interne du serveur'
       })

@@ -70,7 +70,6 @@ const Register: React.FC = () => {
           email: formData.email,
           first_name: formData.first_name,
           last_name: formData.last_name,
-          company_name: undefined // ✅ Optionnel - sera rempli lors création marketplace
         })
       }
 

@@ -9,15 +9,14 @@ import { Navigate } from 'react-router-dom'
 import Header from '../../components/layout/Header'
 import DynamicProductFields from '../../components/product/DynamicProductFields'
 import MultiCategorySelector from '../../components/category/MultiCategorySelector'
-import { supabase } from '../../../lib/supabase'
+import { useUserRole } from '../../../shared/hooks/useUserRole'
 
 function AddProduct() {
   const { user, loading: authLoading } = useAuth()
   const { theme } = useMarketplaceTheme()
   const navigate = useNavigate()
   const { settings, loading: settingsLoading } = useMarketplaceSettings()
-  const [userRole, setUserRole] = useState<string | null>(null)
-  const [roleLoading, setRoleLoading] = useState(false)
+  const { userRole, loading: roleLoading } = useUserRole()
   
   const [formData, setFormData] = useState({
     name: '',
@@ -38,12 +37,7 @@ function AddProduct() {
   const [validationErrors, setValidationErrors] = useState<{[key: string]: string}>({}) 
   const [submitting, setSubmitting] = useState(false)
 
-  // Charger le rôle utilisateur
-  useEffect(() => {
-    if (user) {
-      loadUserRole()
-    }
-  }, [user])
+  // Le rôle utilisateur est maintenant géré par useUserRole hook
 
   // Initialiser les valeurs par défaut depuis les settings
   useEffect(() => {
@@ -56,26 +50,6 @@ function AddProduct() {
     }
   }, [settings])
 
-  const loadUserRole = async () => {
-    if (!user) return
-    
-    try {
-      setRoleLoading(true)
-      const { data, error } = await supabase
-        .from('user_profiles')
-        .select('role')
-        .eq('id', user.id)
-        .single()
-
-      if (error) throw error
-      setUserRole(data.role)
-    } catch (error) {
-      console.error('Erreur lors du chargement du rôle:', error)
-      setUserRole('client')
-    } finally {
-      setRoleLoading(false)
-    }
-  }
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
     const { name, value, type } = e.target

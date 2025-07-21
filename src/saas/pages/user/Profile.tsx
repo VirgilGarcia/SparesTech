@@ -19,7 +19,7 @@ import type { UserProfile } from '../../../shared/types/user'
 function Profile() {
   const { user } = useAuth()
   const { theme } = useMarketplaceTheme()
-  const { tenantId } = useTenant()
+  const { } = useTenant()
   const [profile, setProfile] = useState<UserProfile | null>(null)
   const [loading, setLoading] = useState(true)
   const [saving, setSaving] = useState(false)
@@ -60,7 +60,7 @@ function Profile() {
   const loadProfile = async () => {
     try {
       setLoading(true)
-      const data = await userProfileService.getProfile(user!.id, tenantId || undefined)
+      const data = await userProfileService.getProfile(user!.id)
 
       if (data) {
         setProfile(data)
@@ -88,14 +88,14 @@ function Profile() {
     try {
       setSaving(true)
       
-      await userProfileService.updateProfile(user!.id, {
+      await userProfileService.updateUserProfile(user!.id, {
         phone: formData.phone || null,
         company_name: formData.company_name || null,
         address: formData.address || null,
         city: formData.city || null,
         postal_code: formData.postal_code || null,
         country: formData.country || null
-      }, tenantId || undefined)
+      })
 
       setToast({ message: 'Profil mis à jour avec succès !', type: 'success' })
       await loadProfile()

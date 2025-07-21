@@ -3,7 +3,7 @@ import { validationResult, ValidationChain } from 'express-validator'
 import logger from '../lib/logger'
 
 // Middleware pour traiter les erreurs de validation
-export function handleValidationErrors(req: Request, res: Response, next: NextFunction) {
+export function handleValidationErrors(req: Request, res: Response, next: NextFunction): Response | void {
   const errors = validationResult(req)
 
   if (!errors.isEmpty()) {

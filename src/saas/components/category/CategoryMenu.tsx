@@ -32,7 +32,7 @@ function CategoryMenu({ className = '', maxLevels = 2 }: CategoryMenuProps) {
   const loadCategories = async () => {
     try {
       setLoading(true)
-      const tree = await categoryService.getCategoryTree()
+      const tree = await categoryService.getCategoriesTree()
       setCategoryTree(tree)
     } catch (error) {
       console.error('Erreur lors du chargement des catégories:', error)
@@ -42,7 +42,7 @@ function CategoryMenu({ className = '', maxLevels = 2 }: CategoryMenuProps) {
   }
 
   const renderCategoryItem = (category: CategoryTree, level: number = 0): React.ReactNode => {
-    const hasChildren = category.children.length > 0 && level < maxLevels - 1
+    const hasChildren = category.children || [].length > 0 && level < maxLevels - 1
     const isHovered = hoveredCategory === category.id
 
     return (
@@ -72,7 +72,7 @@ function CategoryMenu({ className = '', maxLevels = 2 }: CategoryMenuProps) {
         {/* Sous-menu */}
         {hasChildren && isHovered && (
           <div className="absolute left-full top-0 z-50 min-w-48 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg shadow-lg">
-            {category.children.map(child => renderCategoryItem(child, level + 1))}
+            {(category.children || []).map(child => renderCategoryItem(child, level + 1))}
           </div>
         )}
       </div>

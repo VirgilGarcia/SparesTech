@@ -3,4 +3,4 @@
 
 // Réexport du wrapper qui utilise l'API backend
 export { categoryService } from './categoryServiceWrapper'
-export type { Category, CreateCategoryData, UpdateCategoryData } from './categoryServiceWrapper'
+export type { Category, CategoryTree, CreateCategoryData, UpdateCategoryData } from './categoryServiceWrapper'

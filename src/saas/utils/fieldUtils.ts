@@ -1,6 +1,6 @@
 import { productStructureService } from '../services/productStructureService'
 import { productService } from '../services/productService'
-import type { ProductField, ProductFieldDisplay, ProductFieldValueWithField } from '../services/productService'
+import type { ProductField, ProductFieldDisplay } from '../services/productService'
 
 export const fieldUtils = {
   async loadFieldDisplay(): Promise<ProductFieldDisplay[]> {
@@ -23,14 +23,17 @@ export const fieldUtils = {
 
   async loadFieldValues(productId: string): Promise<{ [key: string]: string }> {
     try {
-      const fieldValues = await productService.getProductFieldValues(productId) as ProductFieldValueWithField[]
+      const fieldValues = await productService.getProductFieldValues(productId)
       const values: { [key: string]: string } = {}
       
-      fieldValues.forEach(fv => {
-        if (fv.product_fields) {
-          values[fv.product_fields.name] = fv.value
-        }
-      })
+      // Adapter le format selon la structure réelle
+      if (Array.isArray(fieldValues)) {
+        fieldValues.forEach((fv: any) => {
+          if (fv.product_fields) {
+            values[fv.product_fields.name] = fv.value
+          }
+        })
+      }
       
       return values
     } catch (error) {
@@ -43,7 +46,8 @@ export const fieldUtils = {
     const field = fieldDisplay.find(f => f.field_name === fieldName)
     if (!field) return false
     
-    return context === 'catalog' ? field.show_in_catalog : field.show_in_product
+    // Utiliser les propriétés correctes du type ProductFieldDisplay
+    return context === 'catalog' ? field.catalog_order >= 0 : field.product_order >= 0
   },
 
   getFieldValue(fieldName: string, fieldDisplay: ProductFieldDisplay[], product: any, customFieldValues: { [key: string]: string }): string | null {

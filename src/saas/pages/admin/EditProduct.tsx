@@ -7,7 +7,6 @@ import { useMarketplaceTheme } from '../../hooks/useMarketplaceTheme'
 import { Navigate } from 'react-router-dom'
 import Header from '../../components/layout/Header'
 import { ProductEditForm, ProductPreview } from '../../components/product'
-import { supabase } from '../../../lib/supabase'
 import { productStructureService } from '../../services/productStructureService'
 
 function EditProduct() {
@@ -78,7 +77,7 @@ function EditProduct() {
     
     try {
       setLoadingProduct(true)
-      const product = await productService.getProduct(id)
+      const product = await productService.getProductById(id)
       
       if (!product) {
         showError('Produit non trouvé')
@@ -95,7 +94,7 @@ function EditProduct() {
         photo_url: product.photo_url || '',
         visible: product.visible,
         vendable: product.vendable,
-        category_ids: product.product_categories?.map(pc => pc.categories?.id).filter(Boolean) || []
+        category_ids: product.product_categories?.map((pc: any) => pc.categories?.id).filter(Boolean) || []
       })
 
       // Charger les champs personnalisés
@@ -151,7 +150,6 @@ function EditProduct() {
         ...formData,
         prix: parseFloat(formData.prix),
         stock: parseInt(formData.stock),
-        custom_field_values: customFieldValues
       })
 
       showSuccess('Produit mis à jour avec succès ! Redirection en cours...')

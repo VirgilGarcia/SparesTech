@@ -75,6 +75,7 @@ export interface ProductFilter {
   in_stock?: boolean
   limit?: number
   offset?: number
+  page?: number
   sort_by?: string
   sort_order?: 'asc' | 'desc'
 }
@@ -99,8 +100,8 @@ export const useProductApi = () => {
     try {
       const response = await api.get('/products', { params: filter })
       return {
-        data: response.data || [],
-        total: response.total || 0
+        data: response.data?.products || response.data || [],
+        total: response.data?.total || response.data?.length || 0
       }
     } catch (err) {
       const errorMessage = 'Impossible de récupérer les produits'
@@ -217,12 +218,8 @@ export const useProductApi = () => {
       const formData = new FormData()
       formData.append('image', file)
       
-      const response = await api.post(`/products/${productId}/upload-image`, formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      })
-      return response.photo_url
+      const response = await api.post(`/products/${productId}/upload-image`, formData)
+      return response.data?.photo_url || response.data?.url || ''
     } catch (err) {
       const errorMessage = 'Impossible d\'uploader l\'image'
       setError(errorMessage)
@@ -314,10 +311,11 @@ export const useProductApi = () => {
     setLoading(true)
     setError(null)
     try {
-      const response = await api.get(`/products/export?format=${format}`, {
+      const response = await api.get(`/products/export`, {
+        params: { format },
         responseType: 'blob'
       })
-      return response
+      return response.data as Blob
     } catch (err) {
       const errorMessage = 'Impossible d\'exporter les produits'
       setError(errorMessage)
@@ -337,12 +335,8 @@ export const useProductApi = () => {
       const formData = new FormData()
       formData.append('file', file)
       
-      const response = await api.post('/products/import', formData, {
-        headers: {
-          'Content-Type': 'multipart/form-data'
-        }
-      })
-      return response.data
+      const response = await api.post('/products/import', formData)
+      return response.data || { success: 0, errors: [] }
     } catch (err) {
       const errorMessage = 'Impossible d\'importer les produits'
       setError(errorMessage)

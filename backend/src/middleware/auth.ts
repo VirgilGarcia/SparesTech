@@ -7,7 +7,7 @@ export interface AuthenticatedRequest extends Request {
 }
 
 // Middleware d'authentification obligatoire
-export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> {
   try {
     const authHeader = req.headers.authorization
     const { user, error } = await getUserFromToken(authHeader)
@@ -28,7 +28,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
     next()
   } catch (error) {
     logger.error('Erreur lors de l\'authentification', { error })
-    res.status(500).json({
+    return res.status(500).json({
       success: false,
       error: 'Erreur interne du serveur'
     })
@@ -36,7 +36,7 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
 }
 
 // Middleware d'authentification optionnelle
-export async function optionalAuth(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function optionalAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const authHeader = req.headers.authorization
     if (authHeader) {
@@ -51,7 +51,7 @@ export async function optionalAuth(req: AuthenticatedRequest, res: Response, nex
 }
 
 // Middleware pour vérifier que l'utilisateur est propriétaire startup
-export async function requireStartupOwner(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function requireStartupOwner(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> {
   if (!req.user) {
     return res.status(401).json({
       success: false,
@@ -65,7 +65,7 @@ export async function requireStartupOwner(req: AuthenticatedRequest, res: Respon
 }
 
 // Middleware pour vérifier l'accès à un tenant
-export async function requireTenantAccess(req: AuthenticatedRequest, res: Response, next: NextFunction) {
+export async function requireTenantAccess(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> {
   if (!req.user) {
     return res.status(401).json({
       success: false,
