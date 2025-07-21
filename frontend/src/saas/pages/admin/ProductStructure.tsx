@@ -146,9 +146,10 @@ const ProductStructure: React.FC = () => {
       const fieldDisplay = await productStructureService.getAllFieldDisplay()
       const displayToUpdate = fieldDisplay.find(d => d.field_name === editingField.name)
       if (displayToUpdate) {
-        await productStructureService.updateFieldDisplay(displayToUpdate.id, {
+        await productStructureService.updateFieldDisplay([{
+          ...displayToUpdate,
           display_name: editField.label
-        })
+        }])
       }
       
       setEditingField(null)
@@ -226,11 +227,7 @@ const ProductStructure: React.FC = () => {
         return field
       }))
 
-      const reorderData = updates.map(u => ({
-        fieldId: u.id,
-        catalogOrder: u.catalog_order,
-        productOrder: u.product_order
-      }))
+      const reorderData = updates.map(u => u.id)
       await productStructureService.reorderFields(reorderData)
       setSuccessMessage('Ordre des champs mis à jour avec succès')
       setTimeout(() => setSuccessMessage(null), 3000)

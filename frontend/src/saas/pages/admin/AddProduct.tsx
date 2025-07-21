@@ -129,7 +129,7 @@ function AddProduct() {
           // Récupérer l'ID du champ personnalisé
           const fields = await productStructureService.getAllFields()
           const field = fields.find(f => f.name === fieldName)
-          if (field) {
+          if (field && newProduct) {
             await productService.setProductFieldValue(newProduct.id, field.id, value.toString())
           }
         }

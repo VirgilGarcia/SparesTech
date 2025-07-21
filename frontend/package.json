@@ -1,0 +1,14 @@
+{
+  "name": "@sparestech/frontend",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "description": "SparesTech Frontend - Startup & SaaS",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc -b && vite build",
+    "lint": "eslint .",
+    "preview": "vite preview",
+    "type-check": "tsc --noEmit"
+  }
+}

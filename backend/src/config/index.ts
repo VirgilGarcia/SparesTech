@@ -1,6 +1,8 @@
 import dotenv from 'dotenv'
+import path from 'path'
 
-dotenv.config()
+// Charger le .env depuis la racine du monorepo
+dotenv.config({ path: path.resolve(__dirname, '../../..', '.env') })
 
 export const config = {
   // Environment

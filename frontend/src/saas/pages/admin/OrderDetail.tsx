@@ -159,7 +159,7 @@ function OrderDetail() {
             <div className="bg-white rounded-2xl border border-stone-200 p-6">
               <h2 className="text-lg font-semibold text-stone-800 mb-4">Produits commandés</h2>
               <div className="space-y-4">
-                {order.order_items?.map((item) => (
+                {order.order_items?.map((item: any) => (
                   <div key={item.id} className="flex items-center justify-between p-4 bg-stone-50 rounded-xl">
                     <div className="flex-1">
                       <div className="font-medium text-stone-800">{item.product_name}</div>
@@ -185,7 +185,7 @@ function OrderDetail() {
                 <div className="flex justify-between">
                   <span className="text-stone-600">Nombre d'articles</span>
                   <span className="font-medium">
-                    {order.order_items?.reduce((total, item) => total + item.quantity, 0) || 0}
+                    {order.order_items?.reduce((total: number, item: any) => total + item.quantity, 0) || 0}
                   </span>
                 </div>
                 

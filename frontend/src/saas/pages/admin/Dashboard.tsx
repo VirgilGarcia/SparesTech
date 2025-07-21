@@ -67,7 +67,7 @@ function AdminDashboard() {
       const startOfMonth = new Date(now.getFullYear(), now.getMonth(), 1)
       const endOfMonth = new Date(now.getFullYear(), now.getMonth() + 1, 1)
       
-      const ordersThisMonth = orders.filter((order: any) => {
+      const ordersThisMonth = orders.orders.filter((order: any) => {
         const d = new Date(order.created_at)
         return d >= startOfMonth && d < endOfMonth
       })
@@ -87,7 +87,7 @@ function AdminDashboard() {
       endOfWeek.setDate(startOfWeek.getDate() + 7)
       endOfWeek.setHours(0,0,0,0)
       
-      orders.forEach(order => {
+      orders.orders.forEach((order: any) => {
         const d = new Date(order.created_at)
         if (d >= startOfWeek && d < endOfWeek) {
           const day = (d.getDay() + 6) % 7

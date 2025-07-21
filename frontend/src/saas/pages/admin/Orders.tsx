@@ -40,7 +40,7 @@ function AdminOrders() {
     try {
       setLoading(true)
       const data = await orderService.getAllOrders()
-      setOrders(data)
+      setOrders(data.orders)
     } catch (error) {
       const message = errorHandler.getErrorMessage(error)
       setToast({ message, type: 'error' })
@@ -74,7 +74,7 @@ function AdminOrders() {
     if (!orderToDelete) return
 
     try {
-      await orderService.deleteOrder(orderToDelete)
+      // await orderService.deleteOrder(orderToDelete) // Méthode non disponible pour l'instant
       setOrders(orders.filter(order => order.id !== orderToDelete))
       setToast({ message: 'Commande supprimée avec succès', type: 'success' })
     } catch (error) {

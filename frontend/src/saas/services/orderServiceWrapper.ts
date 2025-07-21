@@ -120,4 +120,4 @@ export const orderItemService = {
 }
 
 // Export des types pour compatibilité
-export type { Order, CreateOrderData, OrderItem, UpdateOrderData, OrderFilter, OrderStats }
+export type { Order, CreateOrderData }

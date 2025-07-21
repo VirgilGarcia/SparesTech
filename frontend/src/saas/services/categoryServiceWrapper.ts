@@ -192,5 +192,4 @@ export type { Category, CreateCategoryData }
 // Export de UpdateCategoryData pour compatibilité
 export type UpdateCategoryData = Partial<CreateCategoryData>
 
-// Export du type CategoryTree (résolution du conflit)
-export type { CategoryTree }
+// CategoryTree déjà exporté ligne 7-9

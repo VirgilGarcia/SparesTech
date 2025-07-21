@@ -415,7 +415,6 @@ export type {
   CreateProductData,
   UpdateProductData,
   ProductFilter,
-  ProductField,
-  ProductDisplay,
-  ProductFieldDisplay
+  ProductField
 }
+// ProductDisplay et ProductFieldDisplay déjà exportés via interface ci-dessus
