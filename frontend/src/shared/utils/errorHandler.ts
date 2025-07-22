@@ -4,7 +4,7 @@ interface ErrorInfo {
   details?: string
 }
 
-interface SupabaseError {
+interface ApiError {
   message?: string
   code?: string
   status?: number
@@ -29,13 +29,13 @@ export const errorHandler = {
     }
   },
 
-  // Traiter les erreurs Supabase
-  handleSupabaseError(error: SupabaseError | Error | unknown): ErrorInfo {
+  // Traiter les erreurs API
+  handleApiError(error: ApiError | Error | unknown): ErrorInfo {
     if (!error) {
       return { message: this.userFriendlyErrors.UNKNOWN_ERROR }
     }
 
-    const errorObj = error as SupabaseError
+    const errorObj = error as ApiError
 
     // Erreurs d'authentification
     if (errorObj.message?.includes('Invalid login credentials')) {
@@ -64,22 +64,22 @@ export const errorHandler = {
     }
 
     // Erreurs de permissions
-    if (errorObj.code === 'PGRST301' || errorObj.message?.includes('permission')) {
+    if (errorObj.status === 401 || errorObj.status === 403 || errorObj.message?.includes('permission')) {
       return { message: this.userFriendlyErrors.PERMISSION_DENIED }
     }
 
     // Erreurs de validation
-    if (errorObj.code === 'PGRST116' || errorObj.message?.includes('validation')) {
+    if (errorObj.status === 400 || errorObj.message?.includes('validation')) {
       return { message: this.userFriendlyErrors.VALIDATION_ERROR }
     }
 
     // Erreurs 404
-    if (errorObj.code === 'PGRST116' || errorObj.message?.includes('not found')) {
+    if (errorObj.status === 404 || errorObj.message?.includes('not found')) {
       return { message: this.userFriendlyErrors.NOT_FOUND }
     }
 
     // Erreurs serveur
-    if (errorObj.code?.startsWith('PGRST') || (errorObj.status && errorObj.status >= 500)) {
+    if (errorObj.status && errorObj.status >= 500) {
       return { message: this.userFriendlyErrors.SERVER_ERROR }
     }
 
@@ -88,12 +88,12 @@ export const errorHandler = {
   },
 
   // Logger les erreurs pour le debugging (en développement seulement)
-  logError(error: SupabaseError | Error | unknown, context?: string): void {
+  logError(error: ApiError | Error | unknown, context?: string): void {
     if (import.meta.env.DEV) {
       console.group(`Erreur${context ? ` dans ${context}` : ''}`)
       console.error('Erreur complète:', error)
-      console.error('Message:', (error as SupabaseError)?.message)
-      console.error('Code:', (error as SupabaseError)?.code)
+      console.error('Message:', (error as ApiError)?.message)
+      console.error('Code:', (error as ApiError)?.code)
       console.error('Stack:', (error as Error)?.stack)
       console.groupEnd()
     }
@@ -119,21 +119,21 @@ export const errorHandler = {
   },
 
   // Créer une erreur sécurisée pour l'utilisateur
-  createUserError(error: SupabaseError | Error | unknown, context?: string): ErrorInfo {
+  createUserError(error: ApiError | Error | unknown, context?: string): ErrorInfo {
     this.logError(error, context)
     
-    const supabaseError = this.handleSupabaseError(error)
-    const sanitizedMessage = this.sanitizeErrorMessage(supabaseError.message)
+    const apiError = this.handleApiError(error)
+    const sanitizedMessage = this.sanitizeErrorMessage(apiError.message)
     
     return {
       message: sanitizedMessage,
-      code: supabaseError.code,
+      code: apiError.code,
       details: context
     }
   },
 
   // Obtenir un message d'erreur simple pour l'utilisateur
-  getErrorMessage(error: SupabaseError | Error | unknown, context?: string): string {
+  getErrorMessage(error: ApiError | Error | unknown, context?: string): string {
     return this.createUserError(error, context).message
   }
 } 

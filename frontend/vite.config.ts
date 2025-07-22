@@ -12,8 +12,6 @@ export default defineConfig(({ mode }) => {
     envDir: path.resolve(__dirname, '..'), // Pointer vers la racine
     define: {
       // Explicitement définir les variables pour Vite
-      'import.meta.env.VITE_SUPABASE_URL': JSON.stringify(env.VITE_SUPABASE_URL),
-      'import.meta.env.VITE_SUPABASE_ANON_KEY': JSON.stringify(env.VITE_SUPABASE_ANON_KEY),
       'import.meta.env.VITE_API_URL': JSON.stringify(env.VITE_API_URL),
     }
   }

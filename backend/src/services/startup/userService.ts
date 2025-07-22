@@ -1,4 +1,4 @@
-import { supabaseServiceRole } from '../../lib/supabase'
+import { query } from '../../lib/database'
 import { StartupUser, ApiResponse } from '../../types'
 import logger from '../../lib/logger'
 
@@ -15,43 +15,37 @@ export class StartupUserService {
   }): Promise<ApiResponse<StartupUser>> {
     try {
       // Vérifier si l'utilisateur existe déjà
-      const { data: existingUser, error: findError } = await supabaseServiceRole
-        .from('startup_users')
-        .select('*')
-        .eq('id', userId)
-        .single()
+      const existingResult = await query(
+        'SELECT * FROM startup_users WHERE id = $1',
+        [userId]
+      )
 
-      if (findError && findError.code !== 'PGRST116') { // PGRST116 = pas trouvé
-        throw findError
-      }
-
-      if (existingUser) {
+      if (existingResult.rows.length > 0) {
         logger.info('Profil startup existant récupéré', { userId })
         return {
           success: true,
-          data: existingUser
+          data: existingResult.rows[0]
         }
       }
 
       // Créer le profil startup
-      const { data: newUser, error: createError } = await supabaseServiceRole
-        .from('startup_users')
-        .insert([{
-          id: userId,
-          email: userData.email.toLowerCase().trim(),
-          first_name: userData.first_name.trim(),
-          last_name: userData.last_name.trim(),
-          company_name: userData.company_name?.trim() || null,
-          phone: userData.phone?.trim() || null,
-          country: 'France',
-          is_active: true
-        }])
-        .select()
-        .single()
+      const result = await query(
+        `INSERT INTO startup_users (id, email, first_name, last_name, company_name, phone, country, is_active) 
+         VALUES ($1, $2, $3, $4, $5, $6, $7, $8) 
+         RETURNING *`,
+        [
+          userId,
+          userData.email.toLowerCase().trim(),
+          userData.first_name.trim(),
+          userData.last_name.trim(),
+          userData.company_name?.trim() || null,
+          userData.phone?.trim() || null,
+          'France',
+          true
+        ]
+      )
 
-      if (createError) {
-        throw createError
-      }
+      const newUser = result.rows[0]
 
       logger.info('Nouveau profil startup créé', { userId, email: userData.email })
       return {
@@ -76,25 +70,21 @@ export class StartupUserService {
    */
   static async getById(userId: string): Promise<ApiResponse<StartupUser>> {
     try {
-      const { data, error } = await supabaseServiceRole
-        .from('startup_users')
-        .select('*')
-        .eq('id', userId)
-        .single()
+      const result = await query(
+        'SELECT * FROM startup_users WHERE id = $1',
+        [userId]
+      )
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return {
-            success: false,
-            error: 'Profil startup non trouvé'
-          }
+      if (result.rows.length === 0) {
+        return {
+          success: false,
+          error: 'Profil startup non trouvé'
         }
-        throw error
       }
 
       return {
         success: true,
-        data
+        data: result.rows[0]
       }
 
     } catch (error: any) {
@@ -114,25 +104,21 @@ export class StartupUserService {
    */
   static async getByEmail(email: string): Promise<ApiResponse<StartupUser>> {
     try {
-      const { data, error } = await supabaseServiceRole
-        .from('startup_users')
-        .select('*')
-        .eq('email', email.toLowerCase().trim())
-        .single()
+      const result = await query(
+        'SELECT * FROM startup_users WHERE email = $1',
+        [email.toLowerCase().trim()]
+      )
 
-      if (error) {
-        if (error.code === 'PGRST116') {
-          return {
-            success: false,
-            error: 'Profil startup non trouvé'
-          }
+      if (result.rows.length === 0) {
+        return {
+          success: false,
+          error: 'Profil startup non trouvé'
         }
-        throw error
       }
 
       return {
         success: true,
-        data
+        data: result.rows[0]
       }
 
     } catch (error: any) {
@@ -152,24 +138,38 @@ export class StartupUserService {
    */
   static async updateProfile(userId: string, updates: Partial<Omit<StartupUser, 'id' | 'created_at' | 'updated_at'>>): Promise<ApiResponse<StartupUser>> {
     try {
-      const { data, error } = await supabaseServiceRole
-        .from('startup_users')
-        .update({
-          ...updates,
-          updated_at: new Date().toISOString()
-        })
-        .eq('id', userId)
-        .select()
-        .single()
+      // Construire la requête UPDATE dynamiquement
+      const fields = Object.keys(updates).filter(key => updates[key as keyof typeof updates] !== undefined)
+      const values = fields.map(key => updates[key as keyof typeof updates])
+      
+      if (fields.length === 0) {
+        return {
+          success: false,
+          error: 'Aucune donnée à mettre à jour'
+        }
+      }
 
-      if (error) {
-        throw error
+      const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ')
+      
+      const result = await query(
+        `UPDATE startup_users 
+         SET ${setClause}, updated_at = NOW() 
+         WHERE id = $1 
+         RETURNING *`,
+        [userId, ...values]
+      )
+
+      if (result.rows.length === 0) {
+        return {
+          success: false,
+          error: 'Profil startup non trouvé'
+        }
       }
 
       logger.info('Profil startup mis à jour', { userId })
       return {
         success: true,
-        data
+        data: result.rows[0]
       }
 
     } catch (error: any) {

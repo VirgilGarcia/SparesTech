@@ -17,24 +17,29 @@ export function RequireAuthStartup({ children }: RequireAuthStartupProps) {
   const location = useLocation()
   const [profileLoading, setProfileLoading] = useState(false)
   const [profileError, setProfileError] = useState<string | null>(null)
+  const [profileInitialized, setProfileInitialized] = useState(false)
 
   // Créer ou vérifier le profil startup
   useEffect(() => {
     const ensureStartupProfile = async () => {
-      if (user && !authLoading) {
+      // Éviter les appels répétés - ne s'exécuter que si l'utilisateur est connecté,
+      // l'auth n'est plus en cours de chargement, et le profil n'a pas déjà été initialisé
+      if (user && !authLoading && !profileInitialized && !profileLoading) {
         setProfileLoading(true)
         setProfileError(null)
         
         try {
           await getOrCreateStartupUserProfile(user.id, {
             email: user.email || '',
-            first_name: user.user_metadata?.first_name || '',
-            last_name: user.user_metadata?.last_name || '',
+            first_name: user.user_metadata?.first_name || 'Prénom',
+            last_name: user.user_metadata?.last_name || 'Nom',
             // Pas de company_name ici car il n'est pas dans CreateStartupUser
           })
+          setProfileInitialized(true) // Marquer comme initialisé pour éviter les répétitions
         } catch (error) {
           console.error('Erreur lors de la création du profil startup:', error)
           setProfileError('Impossible de créer le profil startup')
+          setProfileInitialized(true) // Marquer comme traité même en cas d'erreur pour éviter les boucles infinies
         } finally {
           setProfileLoading(false)
         }
@@ -42,7 +47,7 @@ export function RequireAuthStartup({ children }: RequireAuthStartupProps) {
     }
 
     ensureStartupProfile()
-  }, [user, authLoading])
+  }, [user?.id, authLoading, profileInitialized, profileLoading])
 
   // Afficher le loader pendant la vérification d'auth
   if (authLoading || profileLoading) {

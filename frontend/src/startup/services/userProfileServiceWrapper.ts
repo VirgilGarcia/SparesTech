@@ -1,9 +1,7 @@
 // Service wrapper pour migrer progressivement vers l'API backend
-// TODO: Migrer complètement vers useAuthApi (déjà créé)
-import { useAuthApi, type StartupUser } from '../../hooks/api/useAuthApi'
-
-// Instance API pour les appels
-const getApiInstance = () => useAuthApi()
+// ✅ CORRIGÉ - Utilise authApiClient au lieu du hook React
+import { authApiClient } from '../../lib/apiClients'
+import type { StartupUser } from '../../hooks/api/useAuthApi'
 
 /**
  * Service de gestion des profils utilisateur startup avec fonctions critiques migrées
@@ -17,13 +15,12 @@ export const getOrCreateStartupUserProfile = async (_userId: string, profileData
   first_name?: string
   last_name?: string
 }): Promise<StartupUser> => {
-  const api = getApiInstance()
-  const result = await api.createOrGetProfile({
+  const result = await authApiClient.createOrGetProfile({
     email: profileData.email,
-    first_name: profileData.first_name || '',
-    last_name: profileData.last_name || '',
+    first_name: profileData.first_name || 'Prénom', // Valeur par défaut valide (min 2 caractères)
+    last_name: profileData.last_name || 'Nom', // Valeur par défaut valide (min 2 caractères)
     company_name: '',
-    phone: ''
+    phone: '+33600000000' // Numéro mobile français valide par défaut
   })
   
   if (!result) {
@@ -37,16 +34,14 @@ export const getOrCreateStartupUserProfile = async (_userId: string, profileData
  * Récupérer un profil utilisateur startup (MIGRÉ vers API)
  */
 export const getStartupUserProfile = async (_userId: string): Promise<StartupUser | null> => {
-  const api = getApiInstance()
-  return api.getProfile()
+  return authApiClient.getProfile()
 }
 
 /**
  * Mettre à jour un profil utilisateur startup (MIGRÉ vers API)
  */
 export const updateStartupUserProfile = async (_userId: string, updates: Partial<StartupUser>): Promise<StartupUser> => {
-  const api = getApiInstance()
-  const result = await api.updateProfile(updates)
+  const result = await authApiClient.updateProfile(updates)
   
   if (!result) {
     throw new Error('Erreur lors de la mise à jour du profil utilisateur startup')

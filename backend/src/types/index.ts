@@ -127,10 +127,33 @@ export interface Category {
   name: string
   description?: string
   parent_id?: number
-  level: number
-  path: string
-  is_active: boolean
+  is_visible: boolean
   sort_order: number
+  created_at: string
+  updated_at: string
+}
+
+export interface ProductField {
+  id: number
+  tenant_id: string
+  name: string
+  label: string
+  type: 'text' | 'textarea' | 'number' | 'boolean' | 'select' | 'multiselect' | 'date'
+  description?: string
+  is_required: boolean
+  is_visible: boolean
+  sort_order: number
+  options?: string[]
+  default_value?: string
+  created_at: string
+  updated_at: string
+}
+
+export interface ProductFieldValue {
+  id: number
+  product_id: string
+  field_id: number
+  value: string
   created_at: string
   updated_at: string
 }
@@ -186,15 +209,15 @@ export interface PaginationParams {
 }
 
 export interface PaginatedResponse<T> {
+  success: boolean
   data: T[]
   pagination: {
     page: number
     limit: number
     total: number
-    total_pages: number
-    has_next: boolean
-    has_prev: boolean
+    totalPages: number
   }
+  error?: string
 }
 
 // === Marketplace Creation ===

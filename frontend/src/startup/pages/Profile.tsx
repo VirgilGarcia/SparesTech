@@ -42,7 +42,7 @@ const Profile: React.FC = () => {
   // Charger le profil utilisateur depuis la table startup_users
   useEffect(() => {
     const loadUserProfile = async () => {
-      if (user) {
+      if (user && !userProfile) { // Éviter la boucle infinie
         try {
           // Récupérer ou créer le profil utilisateur startup
           const profile = await getOrCreateStartupUserProfile(user.id, {
@@ -67,12 +67,25 @@ const Profile: React.FC = () => {
         } catch (error) {
           console.error('Erreur lors du chargement du profil:', error)
           setMessage('Erreur lors du chargement du profil')
+          // Créer un profil vide pour éviter la boucle infinie
+          setUserProfile({
+            id: '',
+            email: user.email || '',
+            first_name: '',
+            last_name: '',
+            phone: '',
+            company_name: '',
+            address: '',
+            city: '',
+            postal_code: '',
+            country: 'France'
+          } as any)
         }
       }
     }
 
     loadUserProfile()
-  }, [user])
+  }, [user?.id]) // Ne dépendre que de l'ID utilisateur
   
   const [passwordData, setPasswordData] = useState({
     currentPassword: '',

@@ -1,5 +1,5 @@
 import { Request, Response, NextFunction } from 'express'
-import { getUserFromToken } from '../lib/supabase'
+import { AuthService } from '../services/auth/authService'
 import logger from '../lib/logger'
 
 export interface AuthenticatedRequest extends Request {
@@ -10,7 +10,20 @@ export interface AuthenticatedRequest extends Request {
 export async function requireAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<Response | void> {
   try {
     const authHeader = req.headers.authorization
-    const { user, error } = await getUserFromToken(authHeader)
+    
+    if (!authHeader || !authHeader.startsWith('Bearer ')) {
+      logger.warn('Token d\'authentification manquant', { 
+        ip: req.ip, 
+        userAgent: req.get('User-Agent')
+      })
+      return res.status(401).json({
+        success: false,
+        error: 'Authentification requise'
+      })
+    }
+
+    const token = authHeader.substring(7) // Supprimer "Bearer "
+    const { user, error } = await AuthService.getUserFromToken(token)
 
     if (error || !user) {
       logger.warn('Tentative d\'accès non autorisé', { 
@@ -39,8 +52,9 @@ export async function requireAuth(req: AuthenticatedRequest, res: Response, next
 export async function optionalAuth(req: AuthenticatedRequest, res: Response, next: NextFunction): Promise<void> {
   try {
     const authHeader = req.headers.authorization
-    if (authHeader) {
-      const { user } = await getUserFromToken(authHeader)
+    if (authHeader && authHeader.startsWith('Bearer ')) {
+      const token = authHeader.substring(7)
+      const { user } = await AuthService.getUserFromToken(token)
       req.user = user
     }
     next()

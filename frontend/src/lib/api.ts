@@ -1,4 +1,4 @@
-import { supabase } from './supabase'
+// Client API pour notre backend PostgreSQL
 
 interface ApiResponse<T = any> {
   success: boolean
@@ -18,8 +18,8 @@ class ApiClient {
    */
   async request<T = any>(endpoint: string, options: RequestInit = {}): Promise<ApiResponse<T>> {
     try {
-      // Récupérer le token d'authentification
-      const { data: { session } } = await supabase.auth.getSession()
+      // Récupérer le token d'authentification depuis localStorage
+      const authToken = localStorage.getItem('auth_token')
       
       const url = `${this.baseUrl}/api${endpoint}`
       
@@ -27,8 +27,8 @@ class ApiClient {
         ...options,
         headers: {
           'Content-Type': 'application/json',
-          ...(session?.access_token && {
-            'Authorization': `Bearer ${session.access_token}`
+          ...(authToken && {
+            'Authorization': `Bearer ${authToken}`
           }),
           ...options.headers
         }

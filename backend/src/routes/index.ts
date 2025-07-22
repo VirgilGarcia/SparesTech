@@ -1,5 +1,8 @@
 import { Router } from 'express'
 
+// Routes d'authentification principales
+import authRoutes from './auth'
+
 // Routes Startup
 import startupAuthRoutes from './startup/auth'
 import startupMarketplaceRoutes from './startup/marketplace'
@@ -15,6 +18,9 @@ import orderRoutes from './orders'
 import productFieldRoutes from './product-fields'
 
 const router = Router()
+
+// === ROUTES AUTHENTICATION ===
+router.use('/auth', authRoutes)
 
 // === ROUTES STARTUP ===
 router.use('/startup/auth', startupAuthRoutes)

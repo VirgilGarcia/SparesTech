@@ -1,7 +1,6 @@
 import { createContext, useContext, useState, useEffect } from 'react'
 import type { ReactNode } from 'react'
-import { supabase } from '../../lib/supabase'
-import type { User, Session } from '@supabase/supabase-js'
+import type { User, Session } from '../../types/auth'
 import { useAuthenticationApi } from '../../hooks/api/useAuthenticationApi'
 
 interface AuthContextType {
@@ -23,57 +22,69 @@ export function AuthProvider({ children }: AuthProviderProps) {
   const [user, setUser] = useState<User | null>(null)
   const [session, setSession] = useState<Session | null>(null)
   const [loading, setLoading] = useState(true)
-  const { createOrGetStartupProfile, updateUserMetadata } = useAuthenticationApi()
+  const authApi = useAuthenticationApi()
+
+  // Event listeners pour les changements d'auth
+  const authListeners = new Set<(session: Session | null) => void>()
+
+  const notifyAuthChange = (newSession: Session | null) => {
+    authListeners.forEach(listener => listener(newSession))
+  }
 
   useEffect(() => {
-    // Récupérer la session actuelle
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session)
-      setUser(session?.user ?? null)
-      setLoading(false)
-    })
+    // Récupérer la session actuelle depuis localStorage
+    const currentSession = authApi.getCurrentSession()
+    if (currentSession) {
+      setSession(currentSession)
+      setUser(currentSession.user)
+      
+      // Créer le profil startup si nécessaire
+      authApi.createOrGetStartupProfile(currentSession.user.id, {
+        email: currentSession.user.email,
+        first_name: '',
+        last_name: ''
+      }).catch(error => {
+        console.error('Erreur lors de la création du profil startup:', error)
+      })
+    }
+    setLoading(false)
+  }, [])
 
-    // Écouter les changements d'auth
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (event, session) => {
-        setSession(session)
-        setUser(session?.user ?? null)
-        
-        // Si l'utilisateur vient de confirmer son email, créer son profil startup_users via l'API
-        if (event === 'SIGNED_IN' && session?.user && !session?.user.user_metadata?.startup_profile_created) {
-          try {
-            const success = await createOrGetStartupProfile(session.user.id, {
-              email: session.user.email!,
-              first_name: session.user.user_metadata?.first_name,
-              last_name: session.user.user_metadata?.last_name,
-            })
-            
-            if (success) {
-              // Marquer que le profil a été créé
-              await updateUserMetadata({ startup_profile_created: true })
-            }
-          } catch (error) {
-            console.error('Erreur lors de la création du profil startup après connexion:', error)
-          }
-        }
-        
-        setLoading(false)
-      }
-    )
+  // Wrapper pour signIn qui met à jour le state
+  const handleSignIn = async (email: string, password: string): Promise<void> => {
+    await authApi.signIn(email, password)
+    const newSession = authApi.getCurrentSession()
+    setSession(newSession)
+    setUser(newSession?.user || null)
+    notifyAuthChange(newSession)
+  }
 
-    return () => subscription.unsubscribe()
-  }, [createOrGetStartupProfile, updateUserMetadata])
+  // Wrapper pour signUp qui met à jour le state 
+  const handleSignUp = async (email: string, password: string, metadata?: { first_name?: string; last_name?: string; company?: string }) => {
+    const result = await authApi.signUp(email, password, metadata)
+    const newSession = authApi.getCurrentSession()
+    setSession(newSession)
+    setUser(newSession?.user || null)
+    notifyAuthChange(newSession)
+    return result
+  }
 
-  const { signIn, signUp, signOut } = useAuthenticationApi()
+  // Wrapper pour signOut qui met à jour le state
+  const handleSignOut = async (): Promise<void> => {
+    await authApi.signOut()
+    setSession(null)
+    setUser(null)
+    notifyAuthChange(null)
+  }
 
   return (
     <AuthContext.Provider value={{
       user,
       session,
       loading,
-      signIn,
-      signUp,
-      signOut
+      signIn: handleSignIn,
+      signUp: handleSignUp,
+      signOut: handleSignOut
     }}>
       {children}
     </AuthContext.Provider>

@@ -1,6 +1,7 @@
 import app from './app'
 import { config } from './config'
 import logger from './lib/logger'
+import { testConnection } from './lib/database'
 import fs from 'fs'
 import path from 'path'
 
@@ -32,17 +33,25 @@ process.on('unhandledRejection', (reason, promise) => {
   process.exit(1)
 })
 
-// Démarrage du serveur
-const server = app.listen(config.PORT, () => {
-  logger.info('🚀 Serveur SparesTech démarré', {
-    port: config.PORT,
-    environment: config.NODE_ENV,
-    nodeVersion: process.version,
-    pid: process.pid
-  })
+// Démarrage du serveur avec test de connexion base
+const startServer = async () => {
+  // Tester la connexion PostgreSQL
+  const dbConnected = await testConnection()
+  if (!dbConnected) {
+    logger.error('❌ Impossible de se connecter à PostgreSQL - arrêt du serveur')
+    process.exit(1)
+  }
 
-  if (config.NODE_ENV === 'development') {
-    console.log(`
+  const server = app.listen(config.PORT, () => {
+    logger.info('🚀 Serveur SparesTech démarré', {
+      port: config.PORT,
+      environment: config.NODE_ENV,
+      nodeVersion: process.version,
+      pid: process.pid
+    })
+
+    if (config.NODE_ENV === 'development') {
+      console.log(`
     🔥 SparesTech Backend API
     
     📍 Serveur: http://localhost:${config.PORT}
@@ -59,10 +68,17 @@ const server = app.listen(config.PORT, () => {
     
     📝 Logs: backend/logs/
     `)
-  }
+    }
+  })
+
+  // Timeout pour les requêtes longues
+  server.timeout = 30000 // 30 secondes
+  
+  return server
+}
+
+// Démarrer le serveur
+startServer().catch((error) => {
+  logger.error('Erreur lors du démarrage du serveur', { error })
+  process.exit(1)
 })
-
-// Timeout pour les requêtes longues
-server.timeout = 30000 // 30 secondes
-
-export default server

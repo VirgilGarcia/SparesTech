@@ -14,6 +14,8 @@ import type { ProductField } from '../hooks/api/useProductFieldApi'
 import type { Category, CreateCategoryData } from '../hooks/api/useCategoryApi'
 import type { Order, CreateOrderData } from '../hooks/api/useOrderApi'
 import type { UserProfile } from '../hooks/api/useUserApi'
+import type { StartupUser } from '../hooks/api/useAuthApi'
+import type { StartupSubscriptionPlan } from '../hooks/api/useStartupSubscriptionApi'
 
 /**
  * Client API pour les produits
@@ -400,5 +402,64 @@ export const userApiClient = {
     }
     
     return response.data
+  }
+}
+
+/**
+ * Client API pour l'authentification startup
+ */
+export const authApiClient = {
+  async createOrGetProfile(data: {
+    email: string
+    first_name: string
+    last_name: string
+    company_name: string
+    phone: string
+  }): Promise<StartupUser | null> {
+    const response = await api.post<StartupUser>('/startup/auth/profile', data)
+    
+    if (!response.success) {
+      throw new Error(response.error || 'Erreur lors de la création du profil')
+    }
+    
+    return response.data || null
+  },
+
+  async getProfile(): Promise<StartupUser | null> {
+    const response = await api.get<StartupUser>('/startup/auth/profile')
+    
+    if (!response.success) {
+      if (response.error?.includes('404')) {
+        return null
+      }
+      throw new Error(response.error || 'Erreur lors de la récupération du profil')
+    }
+    
+    return response.data || null
+  },
+
+  async updateProfile(updates: Partial<StartupUser>): Promise<StartupUser | null> {
+    const response = await api.put<StartupUser>('/startup/auth/profile', updates)
+    
+    if (!response.success) {
+      throw new Error(response.error || 'Erreur lors de la mise à jour du profil')
+    }
+    
+    return response.data || null
+  }
+}
+
+/**
+ * Client API pour les abonnements startup
+ */
+export const subscriptionApiClient = {
+  async getActivePlans(): Promise<StartupSubscriptionPlan[]> {
+    const response = await api.get<StartupSubscriptionPlan[]>('/startup/marketplace/plans')
+    
+    if (!response.success) {
+      throw new Error(response.error || 'Erreur lors de la récupération des plans')
+    }
+    
+    return response.data || []
   }
 }

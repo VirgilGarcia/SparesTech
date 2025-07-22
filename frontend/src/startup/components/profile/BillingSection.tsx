@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { CreditCard, FileText, Download } from 'lucide-react'
-import type { User } from '@supabase/supabase-js'
+import type { User } from '../../../types/auth'
 import { billingService } from '../../services/billingService'
 import type { Invoice } from '../../../shared/types/billing'
 

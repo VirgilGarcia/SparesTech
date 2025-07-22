@@ -126,7 +126,10 @@ router.post('/create',
       const userId = req.user.id
       const marketplaceData = req.body
 
-      const result = await MarketplaceService.createMarketplace(userId, marketplaceData)
+      const result = await MarketplaceService.createMarketplace({
+        ...marketplaceData,
+        owner_id: userId
+      })
 
       if (!result.success) {
         return res.status(400).json(result)
@@ -134,7 +137,7 @@ router.post('/create',
 
       logger.info('Marketplace créé via API', { 
         userId, 
-        tenantId: result.data?.tenant_id,
+        tenantId: result.data?.id,
         subdomain: marketplaceData.subdomain 
       })
 
@@ -160,7 +163,7 @@ router.get('/my-marketplaces',
   async (req: AuthenticatedRequest, res: Response): Promise<Response | void> => {
     try {
       const userId = req.user.id
-      const result = await MarketplaceService.getUserMarketplaces(userId)
+      const result = await MarketplaceService.getOwnerMarketplaces(userId)
 
       if (!result.success) {
         return res.status(400).json(result)

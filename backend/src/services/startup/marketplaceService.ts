@@ -1,365 +1,142 @@
-import { supabaseServiceRole } from '../../lib/supabase'
+import { query, transaction } from '../../lib/database'
 import { 
   Tenant, 
   TenantSettings, 
   UserProfile, 
-  MarketplaceCreationRequest, 
-  MarketplaceCreationResult,
+  StartupUser,
   ApiResponse 
 } from '../../types'
-import { StartupUserService } from './userService'
-import { StartupSubscriptionService } from './subscriptionService'
 import logger from '../../lib/logger'
 
 export class MarketplaceService {
   /**
-   * Créer un marketplace complet
+   * Créer une nouvelle marketplace (tenant) pour un startup user
    */
-  static async createMarketplace(
-    userId: string, 
-    request: MarketplaceCreationRequest
-  ): Promise<ApiResponse<MarketplaceCreationResult>> {
-    const transaction = await supabaseServiceRole.rpc('begin_transaction')
-    
-    try {
-      // 1. Vérifier/créer le profil startup
-      const userResult = await StartupUserService.getOrCreateProfile(userId, {
-        email: request.admin_email,
-        first_name: request.admin_first_name,
-        last_name: request.admin_last_name,
-        company_name: request.company_name
-      })
-
-      if (!userResult.success) {
-        throw new Error(userResult.error)
-      }
-
-      // 2. Vérifier le plan de subscription
-      const planResult = await StartupSubscriptionService.getPlanById(request.plan_id)
-      if (!planResult.success) {
-        throw new Error('Plan de subscription invalide')
-      }
-
-      const plan = planResult.data!
-
-      // 3. Valider le domaine personnalisé selon le plan
-      let finalCustomDomain = request.custom_domain?.toLowerCase().trim() || null
-      if (finalCustomDomain && !plan.custom_domain_allowed) {
-        logger.warn('Domaine personnalisé refusé pour ce plan', { 
-          planId: request.plan_id, 
-          domain: finalCustomDomain 
-        })
-        finalCustomDomain = null
-      }
-
-      // 4. Vérifier la disponibilité du sous-domaine
-      const subdomainCheck = await this.checkSubdomainAvailability(request.subdomain)
-      if (!subdomainCheck.success) {
-        throw new Error(subdomainCheck.error)
-      }
-
-      // 5. Créer la subscription AVANT le tenant
-      const subscriptionResult = await StartupSubscriptionService.createSubscription({
-        customer_id: userId,
-        plan_id: request.plan_id,
-        billing_cycle: request.billing_cycle,
-        // tenant_id sera mis à jour après création du tenant
-      })
-
-      if (!subscriptionResult.success) {
-        throw new Error(subscriptionResult.error)
-      }
-
-      const subscription = subscriptionResult.data!
-
-      // 6. Créer le tenant
-      const { data: tenant, error: tenantError } = await supabaseServiceRole
-        .from('tenants')
-        .insert([{
-          name: request.company_name,
-          subdomain: request.subdomain.toLowerCase(),
-          custom_domain: finalCustomDomain,
-          owner_id: userId,
-          subscription_status: 'trial',
-          is_active: true
-        }])
-        .select()
-        .single()
-
-      if (tenantError) {
-        throw new Error(`Erreur création tenant: ${tenantError.message}`)
-      }
-
-      // 7. Créer immédiatement le profil admin user_profiles
-      const { error: adminProfileError } = await supabaseServiceRole
-        .from('user_profiles')
-        .insert([{
-          id: userId,
-          tenant_id: tenant.id,
-          email: request.admin_email,
-          first_name: request.admin_first_name,
-          last_name: request.admin_last_name,
-          role: 'admin',
-          is_active: true
-        }])
-
-      if (adminProfileError) {
-        throw new Error(`Erreur création profil admin: ${adminProfileError.message}`)
-      }
-
-      // 8. Créer les paramètres du tenant
-      const { error: settingsError } = await supabaseServiceRole
-        .from('tenant_settings')
-        .insert([{
-          tenant_id: tenant.id,
-          company_name: request.company_name,
-          primary_color: request.primary_color || '#10b981',
-          public_access: request.public_access,
-          show_prices: true,
-          show_stock: true,
-          show_categories: true
-        }])
-
-      if (settingsError) {
-        throw new Error(`Erreur création paramètres: ${settingsError.message}`)
-      }
-
-      // 9. Associer la subscription au tenant
-      await StartupSubscriptionService.updateSubscriptionTenant(subscription.id, tenant.id)
-
-      // 10. Créer les catégories par défaut
-      await this.createDefaultCategories(tenant.id)
-
-      // 11. Créer les champs produits par défaut
-      await this.createDefaultProductFields(tenant.id)
-
-      await supabaseServiceRole.rpc('commit_transaction')
-
-      const marketplaceUrl = finalCustomDomain 
-        ? `https://${finalCustomDomain}` 
-        : `https://${request.subdomain}.spares-tech.com`
-
-      const result: MarketplaceCreationResult = {
-        success: true,
-        tenant_id: tenant.id,
-        subscription_id: subscription.id,
-        marketplace_url: marketplaceUrl,
-        admin_login_url: `${marketplaceUrl}/admin/login`
-      }
-
-      logger.info('Marketplace créé avec succès', {
-        userId,
-        tenantId: tenant.id,
-        subscriptionId: subscription.id,
-        subdomain: request.subdomain
-      })
-
-      return {
-        success: true,
-        data: result
-      }
-
-    } catch (error: any) {
-      await supabaseServiceRole.rpc('rollback_transaction')
-      
-      logger.error('Erreur lors de la création du marketplace', {
-        userId,
-        request,
-        error: error.message
-      })
-
-      return {
-        success: false,
-        error: error.message || 'Erreur lors de la création du marketplace'
-      }
+  static async createMarketplace(marketplaceData: {
+    name: string
+    subdomain: string
+    custom_domain?: string
+    owner_id: string
+    settings: {
+      company_name: string
+      logo_url?: string
+      primary_color?: string
+      show_prices?: boolean
+      show_stock?: boolean
+      show_categories?: boolean
+      public_access?: boolean
+      contact_email?: string
+      contact_phone?: string
     }
-  }
-
-  /**
-   * Vérifier la disponibilité d'un sous-domaine
-   */
-  static async checkSubdomainAvailability(subdomain: string): Promise<ApiResponse<boolean>> {
+  }): Promise<ApiResponse<Tenant>> {
     try {
-      // Validation du format
-      const subdomainRegex = /^[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$/
-      if (!subdomainRegex.test(subdomain.toLowerCase())) {
-        return {
-          success: false,
-          error: 'Format de sous-domaine invalide'
+      return await transaction(async (client) => {
+        // Vérifier que le subdomain n'existe pas déjà
+        const existingSubdomain = await client.query(
+          'SELECT id FROM tenants WHERE subdomain = $1',
+          [marketplaceData.subdomain]
+        )
+
+        if (existingSubdomain.rows.length > 0) {
+          throw new Error('Ce sous-domaine est déjà utilisé')
         }
-      }
 
-      // Mots réservés
-      const reserved = ['www', 'api', 'admin', 'app', 'mail', 'ftp', 'blog', 'shop', 'store', 'support']
-      if (reserved.includes(subdomain.toLowerCase())) {
-        return {
-          success: false,
-          error: 'Ce sous-domaine est réservé'
-        }
-      }
-
-      // Vérifier la disponibilité en base
-      const { data, error } = await supabaseServiceRole
-        .from('tenants')
-        .select('id')
-        .eq('subdomain', subdomain.toLowerCase())
-        .single()
-
-      if (error && error.code !== 'PGRST116') {
-        throw error
-      }
-
-      if (data) {
-        return {
-          success: false,
-          error: 'Ce sous-domaine est déjà utilisé'
-        }
-      }
-
-      return {
-        success: true,
-        data: true
-      }
-
-    } catch (error: any) {
-      logger.error('Erreur lors de la vérification du sous-domaine', {
-        subdomain,
-        error: error.message
-      })
-      return {
-        success: false,
-        error: 'Erreur lors de la vérification'
-      }
-    }
-  }
-
-  /**
-   * Générer des suggestions de sous-domaines
-   */
-  static async generateSubdomainSuggestions(baseName: string): Promise<ApiResponse<string[]>> {
-    try {
-      const suggestions: string[] = []
-      const base = baseName.toLowerCase()
-        .replace(/[^a-z0-9]/g, '-')
-        .replace(/-+/g, '-')
-        .replace(/^-|-$/g, '')
-        .substring(0, 20) // Limiter la longueur
-
-      if (base.length < 2) {
-        return {
-          success: true,
-          data: []
-        }
-      }
-
-      // Essayer le nom de base
-      const baseCheck = await this.checkSubdomainAvailability(base)
-      if (baseCheck.success && baseCheck.data) {
-        suggestions.push(base)
-      }
-
-      // Avec suffixes métier
-      const suffixes = ['store', 'shop', 'parts', 'pro', 'biz']
-      for (const suffix of suffixes) {
-        if (suggestions.length >= 5) break
-        
-        const candidate = `${base}-${suffix}`
-        const check = await this.checkSubdomainAvailability(candidate)
-        if (check.success && check.data) {
-          suggestions.push(candidate)
-        }
-      }
-
-      // Avec numéros
-      for (let i = 1; i <= 10; i++) {
-        if (suggestions.length >= 5) break
-        
-        const candidate = `${base}${i}`
-        const check = await this.checkSubdomainAvailability(candidate)
-        if (check.success && check.data) {
-          suggestions.push(candidate)
-        }
-      }
-
-      return {
-        success: true,
-        data: suggestions.slice(0, 5)
-      }
-
-    } catch (error: any) {
-      logger.error('Erreur lors de la génération de suggestions', {
-        baseName,
-        error: error.message
-      })
-      return {
-        success: false,
-        error: 'Erreur lors de la génération de suggestions'
-      }
-    }
-  }
-
-  /**
-   * Récupérer les marketplaces d'un utilisateur startup
-   */
-  static async getUserMarketplaces(userId: string): Promise<ApiResponse<any[]>> {
-    try {
-      const { data, error } = await supabaseServiceRole
-        .from('tenants')
-        .select(`
-          id,
-          name,
-          subdomain,
-          custom_domain,
-          subscription_status,
-          is_active,
-          created_at,
-          startup_subscriptions (
-            id,
-            status,
-            billing_cycle,
-            current_period_start,
-            current_period_end,
-            startup_subscription_plans (
-              name,
-              display_name,
-              price_monthly,
-              price_yearly
-            )
+        // Vérifier que le custom domain n'existe pas déjà (si fourni)
+        if (marketplaceData.custom_domain) {
+          const existingDomain = await client.query(
+            'SELECT id FROM tenants WHERE custom_domain = $1',
+            [marketplaceData.custom_domain]
           )
-        `)
-        .eq('owner_id', userId)
-        .order('created_at', { ascending: false })
 
-      if (error) {
-        throw error
+          if (existingDomain.rows.length > 0) {
+            throw new Error('Ce domaine personnalisé est déjà utilisé')
+          }
+        }
+
+        // Créer le tenant
+        const tenantResult = await client.query(
+          `INSERT INTO tenants (name, subdomain, custom_domain, owner_id, subscription_status, is_active) 
+           VALUES ($1, $2, $3, $4, $5, $6) 
+           RETURNING *`,
+          [
+            marketplaceData.name,
+            marketplaceData.subdomain,
+            marketplaceData.custom_domain || null,
+            marketplaceData.owner_id,
+            'trial',
+            true
+          ]
+        )
+
+        const tenant = tenantResult.rows[0]
+
+        // Créer les paramètres du tenant
+        await client.query(
+          `INSERT INTO tenant_settings (tenant_id, company_name, logo_url, primary_color, show_prices, show_stock, show_categories, public_access, contact_email, contact_phone) 
+           VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
+          [
+            tenant.id,
+            marketplaceData.settings.company_name,
+            marketplaceData.settings.logo_url || null,
+            marketplaceData.settings.primary_color || '#10b981',
+            marketplaceData.settings.show_prices ?? true,
+            marketplaceData.settings.show_stock ?? true,
+            marketplaceData.settings.show_categories ?? true,
+            marketplaceData.settings.public_access ?? true,
+            marketplaceData.settings.contact_email || null,
+            marketplaceData.settings.contact_phone || null
+          ]
+        )
+
+        // Ajouter le propriétaire comme admin du tenant
+        await client.query(
+          'INSERT INTO tenant_users (tenant_id, user_id, role, is_active) VALUES ($1, $2, $3, $4)',
+          [tenant.id, marketplaceData.owner_id, 'admin', true]
+        )
+
+        logger.info('Nouvelle marketplace créée', {
+          tenantId: tenant.id,
+          ownerId: marketplaceData.owner_id,
+          subdomain: marketplaceData.subdomain,
+          name: marketplaceData.name
+        })
+
+        return tenant
+      })
+    } catch (error: any) {
+      logger.error('Erreur lors de la création de la marketplace', {
+        error: error.message,
+        marketplaceData
+      })
+      return {
+        success: false,
+        error: error.message || 'Erreur lors de la création de la marketplace'
       }
+    }
+  }
 
-      const marketplaces = (data || []).map(tenant => ({
-        tenant_id: tenant.id,
-        name: tenant.name,
-        subdomain: tenant.subdomain,
-        custom_domain: tenant.custom_domain,
-        marketplace_url: tenant.custom_domain 
-          ? `https://${tenant.custom_domain}`
-          : `https://${tenant.subdomain}.spares-tech.com`,
-        admin_url: tenant.custom_domain
-          ? `https://${tenant.custom_domain}/admin`
-          : `https://${tenant.subdomain}.spares-tech.com/admin`,
-        subscription_status: tenant.subscription_status,
-        is_active: tenant.is_active,
-        created_at: tenant.created_at,
-        subscription: tenant.startup_subscriptions?.[0] || null
-      }))
+  /**
+   * Récupérer les marketplaces d'un propriétaire
+   */
+  static async getOwnerMarketplaces(ownerId: string): Promise<ApiResponse<Tenant[]>> {
+    try {
+      const result = await query(
+        `SELECT t.*, ts.company_name, ts.logo_url, ts.primary_color 
+         FROM tenants t 
+         LEFT JOIN tenant_settings ts ON t.id = ts.tenant_id 
+         WHERE t.owner_id = $1 
+         ORDER BY t.created_at DESC`,
+        [ownerId]
+      )
 
       return {
         success: true,
-        data: marketplaces
+        data: result.rows
       }
-
     } catch (error: any) {
       logger.error('Erreur lors de la récupération des marketplaces', {
-        userId,
-        error: error.message
+        error: error.message,
+        ownerId
       })
       return {
         success: false,
@@ -369,58 +146,267 @@ export class MarketplaceService {
   }
 
   /**
-   * Créer les catégories par défaut pour un nouveau tenant
+   * Récupérer une marketplace par ID
    */
-  private static async createDefaultCategories(tenantId: string): Promise<void> {
-    const defaultCategories = [
-      { name: 'Pièces moteur', description: 'Pièces et composants moteur' },
-      { name: 'Carrosserie', description: 'Éléments de carrosserie et accessoires' },
-      { name: 'Électronique', description: 'Composants électroniques et électriques' },
-      { name: 'Filtres', description: 'Filtres à air, huile, carburant' },
-      { name: 'Freinage', description: 'Système de freinage' }
-    ]
-
-    await supabaseServiceRole
-      .from('categories')
-      .insert(
-        defaultCategories.map((cat, index) => ({
-          tenant_id: tenantId,
-          name: cat.name,
-          description: cat.description,
-          level: 0,
-          path: '',
-          sort_order: index,
-          is_active: true
-        }))
+  static async getMarketplaceById(tenantId: string): Promise<ApiResponse<Tenant>> {
+    try {
+      const result = await query(
+        `SELECT t.*, ts.company_name, ts.logo_url, ts.primary_color, ts.show_prices, ts.show_stock, ts.show_categories, ts.public_access, ts.contact_email, ts.contact_phone
+         FROM tenants t 
+         LEFT JOIN tenant_settings ts ON t.id = ts.tenant_id 
+         WHERE t.id = $1`,
+        [tenantId]
       )
+
+      if (result.rows.length === 0) {
+        return {
+          success: false,
+          error: 'Marketplace non trouvée'
+        }
+      }
+
+      return {
+        success: true,
+        data: result.rows[0]
+      }
+    } catch (error: any) {
+      logger.error('Erreur lors de la récupération de la marketplace', {
+        error: error.message,
+        tenantId
+      })
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération de la marketplace'
+      }
+    }
   }
 
   /**
-   * Créer les champs produits par défaut
+   * Récupérer une marketplace par subdomain
    */
-  private static async createDefaultProductFields(tenantId: string): Promise<void> {
-    const defaultFields = [
-      { name: 'reference', display_name: 'Référence', type: 'text', show_in_catalog: true, catalog_order: 1 },
-      { name: 'name', display_name: 'Nom', type: 'text', show_in_catalog: true, catalog_order: 2 },
-      { name: 'price', display_name: 'Prix', type: 'number', show_in_catalog: true, catalog_order: 3 },
-      { name: 'stock_quantity', display_name: 'Stock', type: 'number', show_in_catalog: true, catalog_order: 4 },
-      { name: 'description', display_name: 'Description', type: 'textarea', show_in_catalog: false, catalog_order: 5 }
-    ]
-
-    await supabaseServiceRole
-      .from('product_field_display')
-      .insert(
-        defaultFields.map(field => ({
-          tenant_id: tenantId,
-          field_name: field.name,
-          field_type: 'system',
-          display_name: field.display_name,
-          show_in_catalog: field.show_in_catalog,
-          show_in_product: true,
-          catalog_order: field.catalog_order,
-          product_order: field.catalog_order,
-          is_active: true
-        }))
+  static async getMarketplaceBySubdomain(subdomain: string): Promise<ApiResponse<Tenant>> {
+    try {
+      const result = await query(
+        `SELECT t.*, ts.company_name, ts.logo_url, ts.primary_color, ts.show_prices, ts.show_stock, ts.show_categories, ts.public_access, ts.contact_email, ts.contact_phone
+         FROM tenants t 
+         LEFT JOIN tenant_settings ts ON t.id = ts.tenant_id 
+         WHERE t.subdomain = $1 AND t.is_active = true`,
+        [subdomain]
       )
+
+      if (result.rows.length === 0) {
+        return {
+          success: false,
+          error: 'Marketplace non trouvée'
+        }
+      }
+
+      return {
+        success: true,
+        data: result.rows[0]
+      }
+    } catch (error: any) {
+      logger.error('Erreur lors de la récupération de la marketplace par subdomain', {
+        error: error.message,
+        subdomain
+      })
+      return {
+        success: false,
+        error: 'Erreur lors de la récupération de la marketplace'
+      }
+    }
+  }
+
+  /**
+   * Mettre à jour les paramètres d'une marketplace
+   */
+  static async updateMarketplaceSettings(tenantId: string, settings: Partial<TenantSettings>): Promise<ApiResponse<TenantSettings>> {
+    try {
+      // Construire la requête UPDATE dynamiquement
+      const fields = Object.keys(settings).filter(key => settings[key as keyof typeof settings] !== undefined)
+      const values = fields.map(key => settings[key as keyof typeof settings])
+      
+      if (fields.length === 0) {
+        return {
+          success: false,
+          error: 'Aucune donnée à mettre à jour'
+        }
+      }
+
+      const setClause = fields.map((field, index) => `${field} = $${index + 2}`).join(', ')
+      
+      const result = await query(
+        `UPDATE tenant_settings 
+         SET ${setClause}, updated_at = NOW() 
+         WHERE tenant_id = $1 
+         RETURNING *`,
+        [tenantId, ...values]
+      )
+
+      if (result.rows.length === 0) {
+        return {
+          success: false,
+          error: 'Paramètres de marketplace non trouvés'
+        }
+      }
+
+      logger.info('Paramètres marketplace mis à jour', { tenantId })
+
+      return {
+        success: true,
+        data: result.rows[0]
+      }
+    } catch (error: any) {
+      logger.error('Erreur lors de la mise à jour des paramètres marketplace', {
+        error: error.message,
+        tenantId,
+        settings
+      })
+      return {
+        success: false,
+        error: 'Erreur lors de la mise à jour des paramètres'
+      }
+    }
+  }
+
+  /**
+   * Supprimer/désactiver une marketplace
+   */
+  static async deleteMarketplace(tenantId: string, ownerId: string): Promise<ApiResponse<boolean>> {
+    try {
+      // Vérifier que l'utilisateur est bien le propriétaire
+      const tenantResult = await query(
+        'SELECT owner_id FROM tenants WHERE id = $1',
+        [tenantId]
+      )
+
+      if (tenantResult.rows.length === 0) {
+        return {
+          success: false,
+          error: 'Marketplace non trouvée'
+        }
+      }
+
+      if (tenantResult.rows[0].owner_id !== ownerId) {
+        return {
+          success: false,
+          error: 'Seul le propriétaire peut supprimer la marketplace'
+        }
+      }
+
+      // Désactiver plutôt que supprimer (soft delete)
+      await query(
+        'UPDATE tenants SET is_active = false, updated_at = NOW() WHERE id = $1',
+        [tenantId]
+      )
+
+      logger.info('Marketplace désactivée', { tenantId, ownerId })
+
+      return {
+        success: true,
+        data: true
+      }
+    } catch (error: any) {
+      logger.error('Erreur lors de la suppression de la marketplace', {
+        error: error.message,
+        tenantId,
+        ownerId
+      })
+      return {
+        success: false,
+        error: 'Erreur lors de la suppression de la marketplace'
+      }
+    }
+  }
+
+  /**
+   * Vérifier si un subdomain est disponible
+   */
+  static async checkSubdomainAvailability(subdomain: string): Promise<ApiResponse<boolean>> {
+    try {
+      const result = await query(
+        'SELECT id FROM tenants WHERE subdomain = $1',
+        [subdomain]
+      )
+
+      return {
+        success: true,
+        data: result.rows.length === 0
+      }
+    } catch (error: any) {
+      logger.error('Erreur lors de la vérification du subdomain', {
+        error: error.message,
+        subdomain
+      })
+      return {
+        success: false,
+        error: 'Erreur lors de la vérification du subdomain'
+      }
+    }
+  }
+
+  /**
+   * Générer des suggestions de sous-domaine
+   */
+  static async generateSubdomainSuggestions(baseName: string): Promise<ApiResponse<string[]>> {
+    try {
+      // Nettoyer le nom de base
+      const cleanBase = baseName
+        .toLowerCase()
+        .replace(/[^a-z0-9]/g, '')
+        .substring(0, 20)
+
+      if (!cleanBase) {
+        return {
+          success: false,
+          error: 'Nom de base invalide'
+        }
+      }
+
+      const suggestions: string[] = []
+      
+      // Vérifier si le nom de base est disponible
+      const baseAvailable = await this.checkSubdomainAvailability(cleanBase)
+      if (baseAvailable.success && baseAvailable.data) {
+        suggestions.push(cleanBase)
+      }
+
+      // Générer des variations
+      const variations = [
+        `${cleanBase}shop`,
+        `${cleanBase}store`,
+        `${cleanBase}marketplace`,
+        `${cleanBase}parts`,
+        `${cleanBase}auto`,
+        `${cleanBase}spare`,
+        `${cleanBase}01`,
+        `${cleanBase}02`,
+        `${cleanBase}03`
+      ]
+
+      // Vérifier la disponibilité de chaque variation
+      for (const variation of variations) {
+        if (suggestions.length >= 5) break // Limiter à 5 suggestions
+        
+        const available = await this.checkSubdomainAvailability(variation)
+        if (available.success && available.data) {
+          suggestions.push(variation)
+        }
+      }
+
+      return {
+        success: true,
+        data: suggestions
+      }
+    } catch (error: any) {
+      logger.error('Erreur lors de la génération des suggestions de subdomain', {
+        error: error.message,
+        baseName
+      })
+      return {
+        success: false,
+        error: 'Erreur lors de la génération des suggestions'
+      }
+    }
   }
 }
